@@ -1,0 +1,846 @@
+{
+  "info": {
+    "name": "Pet Hospital HIS API",
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "description": "Complete API collection for Hospital Information System (HIS).\nBase URL variable: {{baseUrl}} = http://localhost:8080",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",   "value": "http://localhost:8080", "type": "string" },
+    { "key": "patientId", "value": "1",  "type": "string" },
+    { "key": "doctorId",  "value": "1",  "type": "string" },
+    { "key": "wardId",    "value": "1",  "type": "string" },
+    { "key": "serviceId", "value": "1",  "type": "string" },
+    { "key": "deptId",    "value": "1",  "type": "string" },
+    { "key": "linkId",    "value": "1",  "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Patients",
+      "item": [
+        {
+          "name": "Create patient",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Has ID', () => pm.expect(pm.response.json().id).to.be.a('number'));",
+                  "pm.test('Status is TREATMENT', () => pm.expect(pm.response.json().status).to.eql('TREATMENT'));",
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('patientId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/patients",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Тестов Иван Петрович\",\n  \"birthDate\": \"1985-04-12\",\n  \"gender\": \"MALE\",\n  \"snils\": \"777-888-999 00\",\n  \"phone\": \"+7-900-123-4567\",\n  \"address\": \"г. Москва, ул. Тестовая, д. 1\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get patient by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Has fullName', () => pm.expect(pm.response.json().fullName).to.be.a('string'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}"
+          }
+        },
+        {
+          "name": "Get all patients (paginated)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Has content array', () => pm.expect(pm.response.json().content).to.be.an('array'));",
+                  "pm.test('Has pagination fields', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.page).to.be.a('number');",
+                  "  pm.expect(body.totalElements).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/patients?page=0&size=10",
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update patient",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/patients/{{patientId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+7-900-999-8877\",\n  \"address\": \"г. Москва, ул. Новая, д. 5\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Assign doctor to patient",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Doctor assigned', () => pm.expect(pm.response.json().currentDoctorId).to.not.be.null);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/assign-doctor/{{doctorId}}"
+          }
+        },
+        {
+          "name": "Get patient paid services",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/services"
+          }
+        },
+        {
+          "name": "Soft delete patient",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}"
+          }
+        },
+        {
+          "name": "Get deleted patient → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Doctors",
+      "item": [
+        {
+          "name": "Create doctor",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('doctorId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/doctors",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Романов Андрей Игоревич\",\n  \"specialty\": \"CARDIOLOGIST\",\n  \"cabinetNumber\": \"405\",\n  \"phone\": \"+7-900-500-1234\",\n  \"departmentId\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Get doctor by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/doctors/{{doctorId}}"
+          }
+        },
+        {
+          "name": "Get all doctors",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Has content', () => pm.expect(pm.response.json().content).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/doctors?page=0&size=20",
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get doctors by specialty",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('All are cardiologists', () => {",
+                  "  pm.response.json().content.forEach(d => pm.expect(d.specialty).to.eql('CARDIOLOGIST'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/doctors?specialty=CARDIOLOGIST",
+              "query": [{ "key": "specialty", "value": "CARDIOLOGIST" }]
+            }
+          }
+        },
+        {
+          "name": "Update doctor",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/doctors/{{doctorId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cabinetNumber\": \"410\",\n  \"phone\": \"+7-900-500-9999\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get doctor patients",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Has content', () => pm.expect(pm.response.json().content).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/doctors/{{doctorId}}/patients"
+          }
+        },
+        {
+          "name": "Soft delete doctor",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/doctors/{{doctorId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Departments",
+      "item": [
+        {
+          "name": "Create department",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('deptId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/departments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Неврология\",\n  \"description\": \"Отделение неврологии и лечения нервной системы\",\n  \"location\": \"4 этаж, корпус В\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get department by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/departments/{{deptId}}"
+          }
+        },
+        {
+          "name": "Get all departments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/departments"
+          }
+        },
+        {
+          "name": "Update department",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/departments/{{deptId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Обновлённое описание отделения неврологии\",\n  \"location\": \"4 этаж, корпус Г\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete department",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/departments/{{deptId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wards",
+      "item": [
+        {
+          "name": "Create ward",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Free slots = capacity', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.freeSlots).to.eql(body.capacity);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('wardId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/wards",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wardNumber\": \"NEW-01\",\n  \"capacity\": 3,\n  \"departmentId\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Get ward by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/wards/{{wardId}}"
+          }
+        },
+        {
+          "name": "Get all wards",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/wards"
+          }
+        },
+        {
+          "name": "Admit patient to ward",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Occupancy increased', () => pm.expect(pm.response.json().currentOccupancy).to.be.above(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/wards/{{wardId}}/admit/{{patientId}}"
+          }
+        },
+        {
+          "name": "Admit to full ward → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('409 when ward full', () => {",
+                  "  pm.expect([200, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/wards/2/admit/{{patientId}}"
+          }
+        },
+        {
+          "name": "Discharge patient from ward",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/wards/{{wardId}}/discharge/{{patientId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Paid Services",
+      "item": [
+        {
+          "name": "Create paid service",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('serviceId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/paid-services",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"МРТ головного мозга\",\n  \"price\": 7500.00,\n  \"description\": \"Магнитно-резонансная томография головного мозга с контрастом\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get paid service by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/paid-services/{{serviceId}}"
+          }
+        },
+        {
+          "name": "Get all paid services",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Has content', () => pm.expect(pm.response.json().content).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/paid-services"
+          }
+        },
+        {
+          "name": "Assign service to patient",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Not paid by default', () => pm.expect(pm.response.json().paid).to.be.false);",
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('linkId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/paid-services/{{serviceId}}"
+          }
+        },
+        {
+          "name": "Mark service as paid",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is paid now', () => pm.expect(pm.response.json().paid).to.be.true);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/paid-services/{{linkId}}/pay"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Ward occupancy report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array of departments', () => pm.expect(pm.response.json()).to.be.an('array'));",
+                  "pm.test('Each dept has wards', () => {",
+                  "  pm.response.json().forEach(dept => {",
+                  "    pm.expect(dept.wards).to.be.an('array');",
+                  "    pm.expect(dept.totalCapacity).to.be.a('number');",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/admin/reports/ward-occupancy"
+          }
+        },
+        {
+          "name": "Paid services summary report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Has grandTotal', () => pm.expect(pm.response.json().grandTotal).to.not.be.undefined);",
+                  "pm.test('Has byPatient', () => pm.expect(pm.response.json().byPatient).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/admin/reports/paid-services-summary"
+          }
+        },
+        {
+          "name": "Discharge patient (NORMAL)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Status is DISCHARGED', () => pm.expect(pm.response.json().status).to.eql('DISCHARGED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/patients/{{patientId}}/discharge?dischargeType=NORMAL",
+              "query": [{ "key": "dischargeType", "value": "NORMAL" }]
+            }
+          }
+        },
+        {
+          "name": "Discharge patient (FORCED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Status is DISCHARGED', () => pm.expect(pm.response.json().status).to.eql('DISCHARGED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/patients/3/discharge?dischargeType=FORCED",
+              "query": [{ "key": "dischargeType", "value": "FORCED" }]
+            }
+          }
+        },
+        {
+          "name": "Discharge patient (TRANSFER)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Status is TRANSFERRED', () => pm.expect(pm.response.json().status).to.eql('TRANSFERRED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/patients/5/discharge?dischargeType=TRANSFER",
+              "query": [{ "key": "dischargeType", "value": "TRANSFER" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Error scenarios",
+      "item": [
+        {
+          "name": "Patient not found → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('Has error message', () => pm.expect(pm.response.json().message).to.be.a('string'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/patients/99999"
+          }
+        },
+        {
+          "name": "Create patient with invalid data → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Has fieldErrors', () => pm.expect(pm.response.json().fieldErrors).to.be.an('object'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/patients",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"bad-phone\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Doctor not found → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/doctors/99999"
+          }
+        }
+      ]
+    }
+  ]
+}

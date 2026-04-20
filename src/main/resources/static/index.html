@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Больничная ИС</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+<div class="layout">
+
+  <!-- ========== SIDEBAR ========== -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span class="logo-icon">🏥</span>
+      <span>Больница ИС</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Обзор</div>
+      <a href="#" data-nav="dashboard" onclick="navigate('dashboard');return false">
+        <i class="fa fa-gauge-high"></i><span>Дашборд</span>
+      </a>
+
+      <div class="nav-section-title">Управление</div>
+      <a href="#" data-nav="patients" onclick="navigate('patients');return false">
+        <i class="fa fa-users"></i><span>Пациенты</span>
+      </a>
+      <a href="#" data-nav="doctors" onclick="navigate('doctors');return false">
+        <i class="fa fa-user-doctor"></i><span>Врачи</span>
+      </a>
+      <a href="#" data-nav="departments" onclick="navigate('departments');return false">
+        <i class="fa fa-hospital"></i><span>Отделения</span>
+      </a>
+      <a href="#" data-nav="wards" onclick="navigate('wards');return false">
+        <i class="fa fa-bed"></i><span>Палаты</span>
+      </a>
+      <a href="#" data-nav="services" onclick="navigate('services');return false">
+        <i class="fa fa-file-invoice-dollar"></i><span>Услуги</span>
+      </a>
+
+      <div class="nav-section-title">Система</div>
+      <a href="#" data-nav="admin" onclick="navigate('admin');return false">
+        <i class="fa fa-chart-bar"></i><span>Администрация</span>
+      </a>
+      <a href="/swagger-ui.html" target="_blank">
+        <i class="fa fa-book-open"></i><span>Swagger UI</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">Pet Hospital HIS v1.0</div>
+  </aside>
+
+  <!-- ========== MAIN CONTENT ========== -->
+  <main class="main-content">
+
+    <!-- Top bar -->
+    <div class="topbar">
+      <span class="topbar-title" id="topbarTitle">Дашборд</span>
+      <div class="topbar-right">
+        <a href="/api-docs" target="_blank" class="btn btn-outline btn-sm">API Docs</a>
+      </div>
+    </div>
+
+    <div class="page-content">
+
+      <!-- ======== DASHBOARD ======== -->
+      <div id="page-dashboard" class="section-page">
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-icon blue"><i class="fa fa-users"></i></div>
+            <div><div class="stat-value" id="stat-patients">…</div><div class="stat-label">Пациентов</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green"><i class="fa fa-user-doctor"></i></div>
+            <div><div class="stat-value" id="stat-doctors">…</div><div class="stat-label">Врачей</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon purple"><i class="fa fa-hospital"></i></div>
+            <div><div class="stat-value" id="stat-depts">…</div><div class="stat-label">Отделений</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon orange"><i class="fa fa-bed"></i></div>
+            <div><div class="stat-value" id="stat-wards">…</div><div class="stat-label">Палат</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon teal"><i class="fa fa-door-open"></i></div>
+            <div><div class="stat-value" id="stat-free">…</div><div class="stat-label">Свободных мест</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon red"><i class="fa fa-file-invoice-dollar"></i></div>
+            <div><div class="stat-value" id="stat-services">…</div><div class="stat-label">Услуг в каталоге</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><i class="fa fa-clock-rotate-left"></i> Последние пациенты</div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrapper">
+              <table>
+                <thead><tr><th>ФИО</th><th>Статус</th><th>Врач</th><th>Палата</th></tr></thead>
+                <tbody id="recent-patients"><tr><td colspan="4" style="text-align:center;padding:20px"><div class="spinner"></div></td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======== PATIENTS ======== -->
+      <div id="page-patients" class="section-page">
+        <div class="card">
+          <div class="card-header">
+            <i class="fa fa-users"></i> Пациенты
+            <button class="btn btn-primary btn-sm" onclick="openModal('modal-patient')">+ Добавить</button>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr><th>#</th><th>ФИО</th><th>СНИЛС</th><th>Статус</th><th>Врач</th><th>Палата</th><th>Действия</th></tr>
+                </thead>
+                <tbody id="patients-table">
+                  <tr><td colspan="7" style="text-align:center;padding:24px"><div class="spinner"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination" id="patients-pagination" style="padding:0 16px 12px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======== DOCTORS ======== -->
+      <div id="page-doctors" class="section-page">
+        <div class="card">
+          <div class="card-header">
+            <i class="fa fa-user-doctor"></i> Врачи
+            <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+              <select id="filter-specialty" class="form-control" style="width:180px;padding:5px 8px;font-size:.82rem"
+                      onchange="loadDoctors(0)">
+                <option value="">Все специальности</option>
+                <option value="CARDIOLOGIST">Кардиолог</option>
+                <option value="SURGEON">Хирург</option>
+                <option value="THERAPIST">Терапевт</option>
+                <option value="NEUROLOGIST">Невролог</option>
+                <option value="PEDIATRICIAN">Педиатр</option>
+                <option value="ORTHOPEDIST">Ортопед</option>
+                <option value="ONCOLOGIST">Онколог</option>
+                <option value="UROLOGIST">Уролог</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="populateDoctorDeptSelect();openModal('modal-doctor')">+ Добавить</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr><th>#</th><th>ФИО</th><th>Специальность</th><th>Кабинет</th><th>Отделение</th><th>Статус</th></tr>
+                </thead>
+                <tbody id="doctors-table">
+                  <tr><td colspan="6" style="text-align:center;padding:24px"><div class="spinner"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination" id="doctors-pagination" style="padding:0 16px 12px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======== DEPARTMENTS ======== -->
+      <div id="page-departments" class="section-page">
+        <div class="card">
+          <div class="card-header">
+            <i class="fa fa-hospital"></i> Отделения
+            <button class="btn btn-primary btn-sm" onclick="populateDeptHeadSelect();openModal('modal-department')">+ Добавить</button>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrapper">
+              <table>
+                <thead><tr><th>#</th><th>Название</th><th>Местоположение</th><th>Заведующий</th></tr></thead>
+                <tbody id="departments-table">
+                  <tr><td colspan="4" style="text-align:center;padding:24px"><div class="spinner"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======== WARDS ======== -->
+      <div id="page-wards" class="section-page">
+        <div class="card">
+          <div class="card-header">
+            <i class="fa fa-bed"></i> Палаты
+            <button class="btn btn-primary btn-sm" onclick="populateWardDeptSelect();openModal('modal-ward')">+ Добавить</button>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrapper">
+              <table>
+                <thead><tr><th>#</th><th>Номер</th><th>Отделение</th><th>Заполненность</th><th>Действия</th></tr></thead>
+                <tbody id="wards-table">
+                  <tr><td colspan="5" style="text-align:center;padding:24px"><div class="spinner"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======== SERVICES ======== -->
+      <div id="page-services" class="section-page">
+        <div class="card">
+          <div class="card-header">
+            <i class="fa fa-file-invoice-dollar"></i> Платные услуги
+            <button class="btn btn-primary btn-sm" onclick="openModal('modal-service')">+ Добавить</button>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrapper">
+              <table>
+                <thead><tr><th>#</th><th>Название</th><th>Цена</th><th>Статус</th></tr></thead>
+                <tbody id="services-table">
+                  <tr><td colspan="4" style="text-align:center;padding:24px"><div class="spinner"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination" id="services-pagination" style="padding:0 16px 12px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======== ADMIN ======== -->
+      <div id="page-admin" class="section-page">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div class="card">
+            <div class="card-header">
+              <i class="fa fa-bed"></i> Занятость палат
+              <button class="btn btn-outline btn-sm" onclick="loadWardReport()">↻ Обновить</button>
+            </div>
+            <div class="card-body" id="ward-report">
+              <div style="text-align:center;padding:20px"><div class="spinner"></div></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <i class="fa fa-chart-pie"></i> Сводка по услугам
+              <button class="btn btn-outline btn-sm" onclick="loadServicesSummary()">↻ Обновить</button>
+            </div>
+            <div class="card-body" id="services-summary">
+              <div style="text-align:center;padding:20px"><div class="spinner"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><i class="fa fa-right-from-bracket"></i> Выписка пациента</div>
+          <div class="card-body">
+            <p style="color:#64748b;margin-top:0;font-size:.88rem">
+              Полная выписка: освобождает палату, отвязывает врача и публикует событие в Kafka.
+            </p>
+            <button class="btn btn-danger" onclick="openDischargeModal()">
+              <i class="fa fa-right-from-bracket"></i> Выписать пациента
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /page-content -->
+  </main>
+</div><!-- /layout -->
+
+<!-- ==================== MODALS ==================== -->
+
+<!-- Create Patient -->
+<div class="modal-overlay" id="modal-patient">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Новый пациент</span>
+      <button class="modal-close" onclick="closeModal('modal-patient')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">ФИО *</label>
+          <input id="p-fullName" class="form-control" placeholder="Иванов Иван Иванович" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Дата рождения *</label>
+          <input id="p-birthDate" type="date" class="form-control" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Пол *</label>
+          <select id="p-gender" class="form-control">
+            <option value="MALE">Мужской</option>
+            <option value="FEMALE">Женский</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">СНИЛС * (формат: 123-456-789 00)</label>
+          <input id="p-snils" class="form-control" placeholder="123-456-789 00" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Телефон</label>
+          <input id="p-phone" class="form-control" placeholder="+7-900-000-0000" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Адрес</label>
+          <input id="p-address" class="form-control" placeholder="г. Москва, ул. ..." />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-patient')">Отмена</button>
+      <button class="btn btn-primary" onclick="savePatient()">Создать</button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign Doctor -->
+<div class="modal-overlay" id="modal-assign-doctor">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Назначить врача</span>
+      <button class="modal-close" onclick="closeModal('modal-assign-doctor')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="assign-patientId" />
+      <div class="form-group">
+        <label class="form-label">Выберите врача</label>
+        <select id="assign-doctorId" class="form-control"></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-assign-doctor')">Отмена</button>
+      <button class="btn btn-primary" onclick="doAssignDoctor()">Назначить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Patient Services -->
+<div class="modal-overlay" id="modal-patient-services">
+  <div class="modal-box" style="max-width:600px">
+    <div class="modal-header">
+      <span class="modal-title">Услуги: <span id="services-patient-name"></span></span>
+      <button class="modal-close" onclick="closeModal('modal-patient-services')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="services-assign-patientId" />
+      <div id="patient-services-list"></div>
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid #f1f5f9">
+        <div class="form-label" style="margin-bottom:8px">Назначить новую услугу:</div>
+        <div style="display:flex;gap:8px">
+          <select id="services-select" class="form-control"></select>
+          <button class="btn btn-primary btn-sm" onclick="doAssignService()" style="white-space:nowrap">+ Назначить</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-patient-services')">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Doctor -->
+<div class="modal-overlay" id="modal-doctor">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Новый врач</span>
+      <button class="modal-close" onclick="closeModal('modal-doctor')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">ФИО *</label>
+        <input id="d-fullName" class="form-control" placeholder="Петров Сергей Иванович" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Специальность *</label>
+          <select id="d-specialty" class="form-control">
+            <option value="CARDIOLOGIST">Кардиолог</option>
+            <option value="SURGEON">Хирург</option>
+            <option value="THERAPIST">Терапевт</option>
+            <option value="NEUROLOGIST">Невролог</option>
+            <option value="PEDIATRICIAN">Педиатр</option>
+            <option value="ORTHOPEDIST">Ортопед</option>
+            <option value="ONCOLOGIST">Онколог</option>
+            <option value="UROLOGIST">Уролог</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Кабинет</label>
+          <input id="d-cabinet" class="form-control" placeholder="301" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Телефон</label>
+          <input id="d-phone" class="form-control" placeholder="+7-900-000-0000" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Отделение</label>
+          <select id="d-departmentId" class="form-control"></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-doctor')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveDoctor()">Создать</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Department -->
+<div class="modal-overlay" id="modal-department">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Новое отделение</span>
+      <button class="modal-close" onclick="closeModal('modal-department')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Название *</label>
+        <input id="dep-name" class="form-control" placeholder="Кардиология" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Описание</label>
+        <input id="dep-description" class="form-control" placeholder="Описание отделения" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Местоположение</label>
+          <input id="dep-location" class="form-control" placeholder="3 этаж, корпус А" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Заведующий</label>
+          <select id="dep-headDoctorId" class="form-control"></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-department')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveDepartment()">Создать</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Ward -->
+<div class="modal-overlay" id="modal-ward">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Новая палата</span>
+      <button class="modal-close" onclick="closeModal('modal-ward')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Номер палаты *</label>
+          <input id="w-number" class="form-control" placeholder="301A" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Вместимость *</label>
+          <input id="w-capacity" type="number" min="1" max="20" class="form-control" placeholder="4" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Отделение *</label>
+        <select id="w-deptId" class="form-control"></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-ward')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveWard()">Создать</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admit Patient to Ward -->
+<div class="modal-overlay" id="modal-admit">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Заселить в палату</span>
+      <button class="modal-close" onclick="closeModal('modal-admit')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="admit-wardId" />
+      <p id="admit-wardLabel" style="font-weight:600;color:#1a6fc4;margin-top:0"></p>
+      <div class="form-group">
+        <label class="form-label">Выберите пациента</label>
+        <select id="admit-patientId" class="form-control"></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-admit')">Отмена</button>
+      <button class="btn btn-primary" onclick="doAdmit()">Заселить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Paid Service -->
+<div class="modal-overlay" id="modal-service">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Новая платная услуга</span>
+      <button class="modal-close" onclick="closeModal('modal-service')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Название *</label>
+        <input id="svc-name" class="form-control" placeholder="МРТ головного мозга" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Цена (₽) *</label>
+        <input id="svc-price" type="number" min="0.01" step="0.01" class="form-control" placeholder="3500.00" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Описание</label>
+        <input id="svc-description" class="form-control" placeholder="Описание услуги" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-service')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveService()">Создать</button>
+    </div>
+  </div>
+</div>
+
+<!-- Discharge Patient -->
+<div class="modal-overlay" id="modal-discharge">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Выписка пациента</span>
+      <button class="modal-close" onclick="closeModal('modal-discharge')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Пациент</label>
+        <select id="discharge-patientId" class="form-control"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Тип выписки</label>
+        <select id="discharge-type" class="form-control">
+          <option value="NORMAL">Обычная</option>
+          <option value="FORCED">Принудительная (AMA)</option>
+          <option value="TRANSFER">Перевод в другое учреждение</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-discharge')">Отмена</button>
+      <button class="btn btn-danger" onclick="doDischarge()">Выписать</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>
