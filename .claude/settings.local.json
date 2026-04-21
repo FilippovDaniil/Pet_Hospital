@@ -4,7 +4,9 @@
       "Bash(mvn --version)",
       "Bash(where mvn *)",
       "Bash(/c/Users/MaxxPC/.m2/wrapper/dists/apache-maven-3.9.12-bin/5nmfsn99br87k5d4ajlekdq10k/apache-maven-3.9.12/bin/mvn compile *)",
-      "Bash(/c/Users/MaxxPC/.m2/wrapper/dists/apache-maven-3.9.12-bin/5nmfsn99br87k5d4ajlekdq10k/apache-maven-3.9.12/bin/mvn test *)"
+      "Bash(/c/Users/MaxxPC/.m2/wrapper/dists/apache-maven-3.9.12-bin/5nmfsn99br87k5d4ajlekdq10k/apache-maven-3.9.12/bin/mvn test *)",
+      "Bash(mvn compile *)",
+      "PowerShell($mvn = \"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\"; cd \"C:\\\\Users\\\\MaxxPC\\\\IdeaProjects\\\\Pet_Hospital\"; & $mvn compile -q 2>&1 | Select-Object -Last 40)"
     ]
   }
 }

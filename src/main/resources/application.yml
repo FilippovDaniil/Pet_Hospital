@@ -76,6 +76,10 @@ springdoc:
     path: /swagger-ui.html
     operationsSorter: method
 
+jwt:
+  secret: "pet-hospital-his-jwt-secret-key-for-hs256-authentication-2024"
+  expiration-ms: 86400000
+
 logging:
   level:
     com.hospital: DEBUG

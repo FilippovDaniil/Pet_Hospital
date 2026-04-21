@@ -20,11 +20,17 @@ function toast(msg, type = 'success') {
 }
 
 async function api(path, options = {}) {
+  const token = localStorage.getItem('token');
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   try {
-    const res = await fetch(API + path, {
-      headers: { 'Content-Type': 'application/json', ...options.headers },
-      ...options,
-    });
+    const res = await fetch(API + path, { headers, ...options });
+    if (res.status === 401) {
+      localStorage.clear();
+      window.location.href = '/login.html';
+      throw new Error('Unauthorized');
+    }
     if (res.status === 204) return null;
     const data = await res.json();
     if (!res.ok) {
@@ -37,6 +43,16 @@ async function api(path, options = {}) {
     if (!(e instanceof Error && e.message)) toast(e.toString(), 'error');
     throw e;
   }
+}
+
+function logout() {
+  localStorage.clear();
+  window.location.href = '/login.html';
+}
+
+function roleLabel(role) {
+  const map = { ROLE_ADMIN: 'Администратор', ROLE_DOCTOR: 'Врач', ROLE_NURSE: 'Медсестра' };
+  return map[role] || role;
 }
 
 function escapeHtml(str) {
@@ -624,5 +640,16 @@ async function doDischarge() {
 // =============================================
 
 document.addEventListener('DOMContentLoaded', () => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    window.location.href = '/login.html';
+    return;
+  }
+
+  const fullName = localStorage.getItem('fullName') || localStorage.getItem('username') || '';
+  const role = localStorage.getItem('role') || '';
+  if ($('user-name'))  $('user-name').textContent  = fullName;
+  if ($('role-badge')) $('role-badge').textContent = roleLabel(role);
+
   navigate('dashboard');
 });

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Регистрация — Больничная ИС</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1c2a3a 0%, #1a3a5c 60%, #14549a 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .auth-card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 24px 64px rgba(0,0,0,.35);
+      width: 100%;
+      max-width: 420px;
+      padding: 40px 36px 36px;
+    }
+
+    .auth-logo {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .auth-logo .icon {
+      width: 64px; height: 64px;
+      background: #d1fae5;
+      border-radius: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      margin-bottom: 12px;
+    }
+    .auth-logo h1 {
+      margin: 0 0 4px;
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    .auth-logo p {
+      margin: 0;
+      font-size: .85rem;
+      color: #64748b;
+    }
+
+    .role-info {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: .82rem;
+      color: #0369a1;
+      margin-bottom: 18px;
+    }
+    .role-info i { margin-right: 6px; }
+
+    .form-group { margin-bottom: 18px; }
+    .form-label {
+      display: block;
+      font-size: .82rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 6px;
+    }
+    .input-wrap { position: relative; }
+    .input-wrap i {
+      position: absolute;
+      left: 12px; top: 50%;
+      transform: translateY(-50%);
+      color: #94a3b8;
+      font-size: .9rem;
+    }
+    .form-control {
+      width: 100%;
+      padding: 10px 12px 10px 36px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: .9rem;
+      color: #1e293b;
+      transition: border-color .15s, box-shadow .15s;
+      background: #fff;
+    }
+    .form-control:focus {
+      outline: none;
+      border-color: #1a6fc4;
+      box-shadow: 0 0 0 3px rgba(26,111,196,.12);
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 11px;
+      background: #198754;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 6px;
+      transition: background .15s, transform .1s;
+    }
+    .btn-submit:hover  { background: #157347; }
+    .btn-submit:active { transform: scale(.98); }
+
+    .auth-footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: .85rem;
+      color: #64748b;
+    }
+    .auth-footer a {
+      color: #1a6fc4;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .auth-footer a:hover { text-decoration: underline; }
+
+    .error-msg {
+      display: none;
+      background: #fee2e2;
+      color: #991b1b;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: .85rem;
+      margin-bottom: 16px;
+    }
+    .error-msg.visible { display: block; }
+  </style>
+</head>
+<body>
+
+<div class="auth-card">
+  <div class="auth-logo">
+    <div class="icon">✚</div>
+    <h1>Регистрация</h1>
+    <p>Создайте аккаунт для доступа к системе</p>
+  </div>
+
+  <div class="role-info">
+    <i class="fa fa-circle-info"></i>
+    Новые пользователи получают роль <strong>Медсестра</strong>. Роль можно изменить через администратора.
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="form-group">
+    <label class="form-label">ФИО *</label>
+    <div class="input-wrap">
+      <i class="fa fa-id-card"></i>
+      <input id="fullName" type="text" class="form-control" placeholder="Иванова Мария Петровна" autocomplete="name" />
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">Логин * (от 3 символов)</label>
+    <div class="input-wrap">
+      <i class="fa fa-user"></i>
+      <input id="username" type="text" class="form-control" placeholder="ivanova_m" autocomplete="username" />
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">Пароль * (от 6 символов)</label>
+    <div class="input-wrap">
+      <i class="fa fa-lock"></i>
+      <input id="password" type="password" class="form-control" placeholder="••••••" autocomplete="new-password" />
+    </div>
+  </div>
+
+  <button class="btn-submit" id="regBtn" onclick="doRegister()">
+    <i class="fa fa-user-plus"></i> Зарегистрироваться
+  </button>
+
+  <div class="auth-footer">
+    Уже есть аккаунт? <a href="/login.html">Войти</a>
+  </div>
+</div>
+
+<script>
+  if (localStorage.getItem('token')) {
+    window.location.href = '/index.html';
+  }
+
+  async function doRegister() {
+    const fullName = document.getElementById('fullName').value.trim();
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    const errorMsg = document.getElementById('errorMsg');
+    const btn      = document.getElementById('regBtn');
+
+    if (!fullName || !username || !password) {
+      showError('Заполните все обязательные поля');
+      return;
+    }
+    if (username.length < 3) {
+      showError('Логин должен содержать не менее 3 символов');
+      return;
+    }
+    if (password.length < 6) {
+      showError('Пароль должен содержать не менее 6 символов');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Регистрация...';
+    errorMsg.classList.remove('visible');
+
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, fullName }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        showError(data.message || 'Ошибка регистрации');
+        return;
+      }
+
+      localStorage.setItem('token',    data.token);
+      localStorage.setItem('username', data.username);
+      localStorage.setItem('fullName', data.fullName || data.username);
+      localStorage.setItem('role',     data.role);
+      window.location.href = '/index.html';
+    } catch (e) {
+      showError('Ошибка соединения с сервером');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa fa-user-plus"></i> Зарегистрироваться';
+    }
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.classList.add('visible');
+  }
+</script>
+</body>
+</html>
