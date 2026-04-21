@@ -23,7 +23,7 @@ spring:
   kafka:
     bootstrap-servers: ${spring.embedded.kafka.brokers}
     producer:
-      transaction-id-prefix: tx-test-
+      transaction-id-prefix: ""
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:

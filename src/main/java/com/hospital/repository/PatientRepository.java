@@ -28,7 +28,7 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
     java.util.List<Patient> findCurrentPatientsInWard(@Param("wardId") Long wardId);
 
     @Query("SELECT p FROM Patient p WHERE p.active = true " +
-           "AND (:q IS NULL OR LOWER(p.fullName) LIKE LOWER(CONCAT('%', :q, '%'))) " +
+           "AND (cast(:q as String) IS NULL OR LOWER(p.fullName) LIKE LOWER(CONCAT('%', cast(:q as String), '%'))) " +
            "AND (:status IS NULL OR p.status = :status)")
     Page<Patient> search(@Param("q") String q, @Param("status") PatientStatus status, Pageable pageable);
 }
