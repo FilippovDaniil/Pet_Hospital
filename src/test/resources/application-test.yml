@@ -3,6 +3,14 @@ spring:
     url: jdbc:tc:postgresql:15:///hospital_test_db
     driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
 
+  cache:
+    type: none
+
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration
+
   jpa:
     hibernate:
       ddl-auto: validate

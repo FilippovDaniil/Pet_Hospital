@@ -17,7 +17,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.hospital.entity.PatientStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -145,5 +153,53 @@ class PatientServiceTest {
 
         assertThat(patient.isActive()).isFalse();
         verify(patientRepository).save(patient);
+    }
+
+    @Test
+    void search_withBlankQuery_passesNullToRepository() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(patientRepository.search(null, null, pageable))
+                .thenReturn(new PageImpl<>(Collections.emptyList(), pageable, 0));
+
+        patientService.search("   ", null, pageable);
+
+        verify(patientRepository).search(null, null, pageable);
+    }
+
+    @Test
+    void search_withName_passestrimmedQueryToRepository() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(patientRepository.search("Иванов", null, pageable))
+                .thenReturn(new PageImpl<>(List.of(patient), pageable, 1));
+        when(patientMapper.toResponse(patient)).thenReturn(new PatientResponse());
+
+        patientService.search("  Иванов  ", null, pageable);
+
+        verify(patientRepository).search("Иванов", null, pageable);
+    }
+
+    @Test
+    void search_withStatus_passesStatusToRepository() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(patientRepository.search(null, PatientStatus.TREATMENT, pageable))
+                .thenReturn(new PageImpl<>(Collections.emptyList(), pageable, 0));
+
+        patientService.search(null, PatientStatus.TREATMENT, pageable);
+
+        verify(patientRepository).search(null, PatientStatus.TREATMENT, pageable);
+    }
+
+    @Test
+    void search_returnsCorrectPageMetadata() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Patient> page = new PageImpl<>(List.of(patient), pageable, 1);
+        when(patientRepository.search("Test", null, pageable)).thenReturn(page);
+        when(patientMapper.toResponse(patient)).thenReturn(new PatientResponse());
+
+        var result = patientService.search("Test", null, pageable);
+
+        assertThat(result.getTotalElements()).isEqualTo(1);
+        assertThat(result.getPage()).isEqualTo(0);
+        assertThat(result.getContent()).hasSize(1);
     }
 }

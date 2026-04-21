@@ -13,6 +13,8 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import org.springframework.security.test.context.support.WithMockUser;
+
 import java.time.LocalDate;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -27,13 +29,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @EmbeddedKafka(partitions = 1,
         topics = {"patient-events", "admission-events", "paid-service-events",
-                  "doctor-events", "department-events"},
+                  "doctor-events", "department-events",
+                  "patient-events.DLT", "admission-events.DLT", "paid-service-events.DLT",
+                  "doctor-events.DLT", "department-events.DLT"},
         brokerProperties = {
                 "transaction.state.log.replication.factor=1",
                 "transaction.state.log.min.isr=1"
         })
 @DirtiesContext
-class PatientIntegrationTest {
+@WithMockUser(roles = "ADMIN")
+class PatientIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -131,5 +136,32 @@ class PatientIntegrationTest {
         // Should now return 404
         mockMvc.perform(get("/api/patients/" + id))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void searchPatients_byName_returnsFilteredResults() throws Exception {
+        // Create a patient first
+        CreatePatientRequest request = new CreatePatientRequest();
+        request.setFullName("Поиск Тестовый Пациент");
+        request.setBirthDate(LocalDate.of(1980, 1, 1));
+        request.setGender(Gender.MALE);
+        request.setSnils("444-555-666 77");
+
+        mockMvc.perform(post("/api/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/patients/search?q=Поиск Тестовый"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content[0].fullName").value("Поиск Тестовый Пациент"));
+    }
+
+    @Test
+    void searchPatients_byStatus_returnsOnlyMatchingStatus() throws Exception {
+        mockMvc.perform(get("/api/patients/search?status=TREATMENT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
     }
 }
