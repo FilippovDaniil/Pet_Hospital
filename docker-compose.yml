@@ -49,5 +49,27 @@ services:
       timeout: 10s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: hospital-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafdrop:
+    image: obsidiandynamics/kafdrop:latest
+    container_name: hospital-kafdrop
+    ports:
+      - "9000:9000"
+    environment:
+      KAFKA_BROKERCONNECT: "kafka:9092"
+      JVM_OPTS: "-Xms32M -Xmx64M"
+    depends_on:
+      - kafka
+
 volumes:
   postgres_data:

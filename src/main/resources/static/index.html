@@ -117,7 +117,18 @@
         <div class="card">
           <div class="card-header">
             <i class="fa fa-users"></i> Пациенты
-            <button class="btn btn-primary btn-sm" onclick="openModal('modal-patient')">+ Добавить</button>
+            <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <input id="patient-search" class="form-control" style="width:200px;padding:5px 8px;font-size:.82rem"
+                     placeholder="Поиск по ФИО..." oninput="debouncedPatientSearch()" />
+              <select id="patient-status-filter" class="form-control" style="width:160px;padding:5px 8px;font-size:.82rem"
+                      onchange="debouncedPatientSearch()">
+                <option value="">Все статусы</option>
+                <option value="TREATMENT">На лечении</option>
+                <option value="DISCHARGED">Выписан</option>
+                <option value="TRANSFERRED">Переведён</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="openModal('modal-patient')">+ Добавить</button>
+            </div>
           </div>
           <div class="card-body" style="padding:0">
             <div class="table-wrapper">

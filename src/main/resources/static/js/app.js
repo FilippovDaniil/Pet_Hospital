@@ -217,6 +217,49 @@ async function loadPatients(page = 0) {
 
 window.loadPatients = loadPatients;
 
+let patientSearchTimer = null;
+function debouncedPatientSearch() {
+  clearTimeout(patientSearchTimer);
+  patientSearchTimer = setTimeout(() => searchPatients(0), 300);
+}
+
+async function searchPatients(page = 0) {
+  patientsPage = page;
+  const q      = $('patient-search')?.value?.trim() || '';
+  const status = $('patient-status-filter')?.value  || '';
+
+  const isFiltered = q || status;
+  if (!isFiltered) { loadPatients(0); return; }
+
+  const params = new URLSearchParams({ page, size: 15 });
+  if (q)      params.append('q', q);
+  if (status) params.append('status', status);
+
+  const data = await api(`/api/patients/search?${params}`);
+  if (!data) return;
+
+  $('patients-table').innerHTML = data.content.length === 0
+    ? `<tr><td colspan="7"><div class="empty-state"><i class="fa fa-users"></i>Пациентов не найдено</div></td></tr>`
+    : data.content.map(p => `
+        <tr>
+          <td><strong>#${p.id}</strong></td>
+          <td>${escapeHtml(p.fullName)}</td>
+          <td>${escapeHtml(p.snils)}</td>
+          <td>${statusBadge(p.status)}</td>
+          <td>${escapeHtml(p.currentDoctorName)}</td>
+          <td>${escapeHtml(p.currentWardNumber)}</td>
+          <td>
+            <button class="btn btn-outline btn-sm btn-icon" title="Назначить врача" onclick="openAssignDoctorModal(${p.id})">👨‍⚕️</button>
+            <button class="btn btn-outline btn-sm btn-icon" title="Услуги" onclick="openPatientServicesModal(${p.id}, '${escapeHtml(p.fullName)}')">🧾</button>
+            <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="deletePatient(${p.id})">🗑</button>
+          </td>
+        </tr>`).join('');
+
+  buildPagination('patients-pagination', data, 'searchPatients');
+}
+
+window.searchPatients = searchPatients;
+
 async function savePatient() {
   const body = {
     fullName: $('p-fullName').value.trim(),

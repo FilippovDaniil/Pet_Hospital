@@ -10,10 +10,13 @@ import com.hospital.repository.*;
 import com.hospital.service.AdminService;
 import com.hospital.service.event.EventPublisher;
 import com.hospital.service.event.PatientEvent;
+import com.hospital.config.CacheConfig;
 import com.hospital.service.strategy.DischargeStrategyFactory;
 import com.hospital.service.strategy.DischargeType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +42,7 @@ public class AdminServiceImpl implements AdminService {
     private final EventPublisher eventPublisher;
 
     @Override
+    @Cacheable(CacheConfig.WARD_OCCUPANCY)
     public List<WardOccupancyReport> getWardOccupancyReport() {
         List<Ward> wards = wardRepository.findAllWithDepartment();
         Map<Long, List<Ward>> byDepartment = wards.stream()
@@ -77,6 +81,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @Cacheable(CacheConfig.SERVICES_SUMMARY)
     public PaidServiceSummaryReport getPaidServicesSummary() {
         List<PatientPaidService> all = ppsRepository.findAll();
         Map<Long, List<PatientPaidService>> byPatient = all.stream()
@@ -110,6 +115,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {CacheConfig.WARD_OCCUPANCY, CacheConfig.SERVICES_SUMMARY}, allEntries = true)
     public PatientResponse dischargePatient(Long patientId, DischargeType dischargeType) {
         Patient patient = patientRepository.findByIdAndActiveTrue(patientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient", patientId));

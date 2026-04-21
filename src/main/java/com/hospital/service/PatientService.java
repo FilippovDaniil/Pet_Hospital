@@ -5,6 +5,7 @@ import com.hospital.dto.request.UpdatePatientRequest;
 import com.hospital.dto.response.PageResponse;
 import com.hospital.dto.response.PatientPaidServiceResponse;
 import com.hospital.dto.response.PatientResponse;
+import com.hospital.entity.PatientStatus;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
@@ -24,4 +25,6 @@ public interface PatientService {
     PatientResponse assignDoctor(Long patientId, Long doctorId);
 
     List<PatientPaidServiceResponse> getServices(Long patientId);
+
+    PageResponse<PatientResponse> search(String q, PatientStatus status, Pageable pageable);
 }

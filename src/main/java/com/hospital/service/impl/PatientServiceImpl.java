@@ -70,6 +70,13 @@ public class PatientServiceImpl implements PatientService {
     }
 
     @Override
+    public PageResponse<PatientResponse> search(String q, PatientStatus status, Pageable pageable) {
+        String searchQ = (q != null && !q.isBlank()) ? q.trim() : null;
+        Page<Patient> page = patientRepository.search(searchQ, status, pageable);
+        return toPageResponse(page.map(patientMapper::toResponse));
+    }
+
+    @Override
     @Transactional
     public PatientResponse update(Long id, UpdatePatientRequest request) {
         Patient patient = findActiveById(id);

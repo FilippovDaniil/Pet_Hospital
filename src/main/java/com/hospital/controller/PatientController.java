@@ -5,6 +5,7 @@ import com.hospital.dto.request.UpdatePatientRequest;
 import com.hospital.dto.response.PageResponse;
 import com.hospital.dto.response.PatientPaidServiceResponse;
 import com.hospital.dto.response.PatientResponse;
+import com.hospital.entity.PatientStatus;
 import com.hospital.service.PatientService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,6 +45,17 @@ public class PatientController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(patientService.getAll(PageRequest.of(page, size, Sort.by("id"))));
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "Search patients by name and/or status")
+    public ResponseEntity<PageResponse<PatientResponse>> search(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) PatientStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(patientService.search(q, status,
+                PageRequest.of(page, size, Sort.by("id"))));
     }
 
     @PutMapping("/{id}")
