@@ -212,6 +212,10 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
+                    <!-- Each test class with @DirtiesContext + EmbeddedKafka gets its own JVM
+                         to prevent Kafka port conflicts between test classes. -->
+                    <forkCount>1</forkCount>
+                    <reuseForks>false</reuseForks>
                     <systemPropertyVariables>
                         <api.version>1.44</api.version>
                     </systemPropertyVariables>
