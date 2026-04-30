@@ -30,7 +30,7 @@
       <a href="#" data-nav="doctors" onclick="navigate('doctors');return false">
         <i class="fa fa-user-doctor"></i><span>Врачи</span>
       </a>
-      <a href="#" data-nav="departments" onclick="navigate('departments');return false">
+      <a href="#" data-nav="departments" data-show-roles="ROLE_ADMIN,ROLE_DOCTOR" onclick="navigate('departments');return false">
         <i class="fa fa-hospital"></i><span>Отделения</span>
       </a>
       <a href="#" data-nav="wards" onclick="navigate('wards');return false">
@@ -40,8 +40,8 @@
         <i class="fa fa-file-invoice-dollar"></i><span>Услуги</span>
       </a>
 
-      <div class="nav-section-title">Система</div>
-      <a href="#" data-nav="admin" onclick="navigate('admin');return false">
+      <div class="nav-section-title" data-show-roles="ROLE_ADMIN">Система</div>
+      <a href="#" data-nav="admin" data-show-roles="ROLE_ADMIN" onclick="navigate('admin');return false">
         <i class="fa fa-chart-bar"></i><span>Администрация</span>
       </a>
       <a href="/swagger-ui.html" target="_blank">
@@ -127,7 +127,7 @@
                 <option value="DISCHARGED">Выписан</option>
                 <option value="TRANSFERRED">Переведён</option>
               </select>
-              <button class="btn btn-primary btn-sm" onclick="openModal('modal-patient')">+ Добавить</button>
+              <button class="btn btn-primary btn-sm" data-show-roles="ROLE_ADMIN,ROLE_DOCTOR" onclick="openModal('modal-patient')">+ Добавить</button>
             </div>
           </div>
           <div class="card-body" style="padding:0">
@@ -164,7 +164,7 @@
                 <option value="ONCOLOGIST">Онколог</option>
                 <option value="UROLOGIST">Уролог</option>
               </select>
-              <button class="btn btn-primary btn-sm" onclick="populateDoctorDeptSelect();openModal('modal-doctor')">+ Добавить</button>
+              <button class="btn btn-primary btn-sm" data-show-roles="ROLE_ADMIN" onclick="populateDoctorDeptSelect();openModal('modal-doctor')">+ Добавить</button>
             </div>
           </div>
           <div class="card-body" style="padding:0">
@@ -188,7 +188,7 @@
         <div class="card">
           <div class="card-header">
             <i class="fa fa-hospital"></i> Отделения
-            <button class="btn btn-primary btn-sm" onclick="populateDeptHeadSelect();openModal('modal-department')">+ Добавить</button>
+            <button class="btn btn-primary btn-sm" data-show-roles="ROLE_ADMIN" onclick="populateDeptHeadSelect();openModal('modal-department')">+ Добавить</button>
           </div>
           <div class="card-body" style="padding:0">
             <div class="table-wrapper">
@@ -208,7 +208,7 @@
         <div class="card">
           <div class="card-header">
             <i class="fa fa-bed"></i> Палаты
-            <button class="btn btn-primary btn-sm" onclick="populateWardDeptSelect();openModal('modal-ward')">+ Добавить</button>
+            <button class="btn btn-primary btn-sm" data-show-roles="ROLE_ADMIN" onclick="populateWardDeptSelect();openModal('modal-ward')">+ Добавить</button>
           </div>
           <div class="card-body" style="padding:0">
             <div class="table-wrapper">
@@ -228,7 +228,7 @@
         <div class="card">
           <div class="card-header">
             <i class="fa fa-file-invoice-dollar"></i> Платные услуги
-            <button class="btn btn-primary btn-sm" onclick="openModal('modal-service')">+ Добавить</button>
+            <button class="btn btn-primary btn-sm" data-show-roles="ROLE_ADMIN" onclick="openModal('modal-service')">+ Добавить</button>
           </div>
           <div class="card-body" style="padding:0">
             <div class="table-wrapper">

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <springProperty scope="context" name="lokiUrl" source="logging.loki.url" defaultValue="http://localhost:3100"/>
+
+    <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+        <http class="com.github.loki4j.logback.JavaHttpSender">
+            <url>${lokiUrl}/loki/api/v1/push</url>
+            <connectionTimeoutMs>5000</connectionTimeoutMs>
+            <requestTimeoutMs>5000</requestTimeoutMs>
+        </http>
+        <format>
+            <label>
+                <pattern>app=pet-hospital,level=%level,logger=%logger{0}</pattern>
+            </label>
+            <message>
+                <pattern>level=%level logger=%logger{36} thread=%thread | %msg%n%ex{full}</pattern>
+            </message>
+            <sortByTime>true</sortByTime>
+        </format>
+        <verbose>false</verbose>
+        <drainOnStop>false</drainOnStop>
+    </appender>
+
+    <appender name="LOKI_ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="LOKI"/>
+        <queueSize>1000</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+    </appender>
+
+    <logger name="com.hospital" level="DEBUG"/>
+    <logger name="org.springframework.kafka" level="INFO"/>
+    <logger name="org.apache.kafka" level="WARN"/>
+    <logger name="org.hibernate.SQL" level="WARN"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="LOKI_ASYNC"/>
+    </root>
+</configuration>

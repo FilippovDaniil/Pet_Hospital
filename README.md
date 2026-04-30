@@ -32,6 +32,8 @@
 23. [Запуск проекта](#23-запуск-проекта)
 24. [Конфигурация](#24-конфигурация)
 25. [Бизнес-правила системы](#25-бизнес-правила-системы)
+26. [Ролевой интерфейс — фронтенд](#26-ролевой-интерфейс--фронтенд)
+27. [Мониторинг: Loki + Grafana](#27-мониторинг-loki--grafana)
 
 ---
 
@@ -107,6 +109,9 @@
 | Zookeeper | 7.6.0 (Confluent) | Координация Kafka-кластера |
 | Redis | 7 | In-memory кэш |
 | Kafdrop | latest | Web UI для мониторинга Kafka |
+| Loki | 2.9.0 | Хранилище и индексация логов |
+| Grafana | 10.2.3 | Визуализация логов (LogQL) |
+| loki-logback-appender | 1.5.2 | Прямая отправка логов из Spring Boot в Loki |
 
 ### Тестирование
 
@@ -1436,7 +1441,7 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 
 ### docker-compose.yml
 
-Описывает 6 сервисов:
+Описывает 7 сервисов инфраструктуры (само приложение запускается локально через Maven/IDE):
 
 | Сервис | Образ | Порт | Назначение |
 |---|---|---|---|
@@ -1445,9 +1450,14 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 | kafka | confluentinc/cp-kafka:7.6.0 | 9092 | Брокер сообщений |
 | redis | redis:7-alpine | 6379 | Кэш |
 | kafdrop | obsidiandynamics/kafdrop | 9000 | Web UI для Kafka |
-| app | ./Dockerfile | 8080 | Само приложение |
+| **loki** | grafana/loki:2.9.0 | 3100 | Хранилище логов |
+| **grafana** | grafana/grafana:10.2.3 | 3000 | Визуализация логов |
 
-**Kafdrop** — веб-интерфейс для Kafka по адресу `http://localhost:9000`. Позволяет просматривать топики, читать сообщения, мониторить группы консьюмеров.
+**Kafdrop** — `http://localhost:9000`. Просмотр топиков, чтение сообщений, мониторинг групп консьюмеров.
+
+**Grafana** — `http://localhost:3000` (admin / admin). Datasource Loki провизионируется автоматически из `monitoring/grafana/provisioning/datasources/loki.yml`.
+
+**Loki** получает логи напрямую от Spring Boot через `loki4j` Logback-аппендер — без Promtail и без агентов.
 
 ---
 
@@ -1603,50 +1613,145 @@ Testcontainers требует Docker. На Windows с Docker Desktop нужна 
 
 ### Требования
 
-- Java 17+
-- Maven 3.9+
-- Docker Desktop (для интеграционных тестов и docker-compose)
+| Инструмент | Версия | Зачем |
+|---|---|---|
+| Java | 17+ | Запуск приложения |
+| Maven | 3.9+ | Сборка проекта |
+| Docker Desktop | 4.x+ | Контейнеры инфраструктуры |
 
-### Запуск через Docker Compose (рекомендуется)
+> **Windows**: для Testcontainers включите TCP в Docker Desktop:
+> **Settings → General → Expose daemon on tcp://localhost:2375 without TLS**
+
+---
+
+### Быстрый старт (2 команды)
 
 ```bash
-# Поднять всю инфраструктуру + приложение
+# 1. Поднять всю инфраструктуру
 docker-compose up -d
-
-# Приложение:  http://localhost:8080
-# Swagger UI:  http://localhost:8080/swagger-ui.html
-# Kafdrop:     http://localhost:9000
-# Actuator:    http://localhost:8080/actuator/health
-```
-
-### Запуск локально (для разработки)
-
-```bash
-# 1. Поднять только инфраструктуру
-docker-compose up -d postgres kafka zookeeper redis
 
 # 2. Запустить приложение
 mvn spring-boot:run
-
-# Или через IDE: запустить HospitalApplication.java
 ```
 
-### Запуск тестов
+После старта открыть: **http://localhost:8080** (войти: admin / admin123)
+
+---
+
+### Пошаговый запуск с объяснениями
+
+#### Шаг 1 — Поднять инфраструктуру
 
 ```bash
-# Все тесты (нужен запущенный Docker Desktop с открытым TCP 2375)
-mvn test
-
-# Только юнит-тесты (Docker не нужен)
-mvn test -Dtest="PatientServiceTest,WardServiceTest,AdminServiceTest,JwtUtilTest"
-
-# Только интеграционные тесты
-mvn test -Dtest="AuthIntegrationTest,PatientIntegrationTest"
+docker-compose up -d
 ```
+
+Запускает 7 контейнеров. Проверить готовность:
+
+```bash
+docker-compose ps
+```
+
+Все сервисы должны быть `running` или `healthy`.
+
+| Контейнер | Порт | Что там |
+|---|---|---|
+| hospital-postgres | 5432 | PostgreSQL — основная БД |
+| hospital-redis | 6379 | Redis — кэш |
+| hospital-zookeeper | 2181 | Zookeeper (для Kafka) |
+| hospital-kafka | 9092 | Apache Kafka |
+| hospital-kafdrop | http://localhost:9000 | UI просмотра Kafka-топиков |
+| **hospital-loki** | 3100 | Хранилище логов |
+| **hospital-grafana** | http://localhost:3000 | Дашборды логов |
+
+#### Шаг 2 — Запустить приложение
+
+```bash
+mvn spring-boot:run
+```
+
+Или через IDE — запустить `HospitalApplication.java`.
+
+При старте происходит автоматически:
+- Flyway применяет миграции V1 → V2 → V3
+- `DataInitializer` создаёт пользователя `admin / admin123`
+- `loki4j` начинает отправлять логи в Loki на `localhost:3100`
+
+#### Шаг 3 — Открыть интерфейсы
+
+| Интерфейс | URL | Учётные данные |
+|---|---|---|
+| **Web-интерфейс (HIS)** | http://localhost:8080 | admin / admin123 |
+| Swagger UI | http://localhost:8080/swagger-ui.html | — |
+| API Docs | http://localhost:8080/api-docs | — |
+| Actuator Health | http://localhost:8080/actuator/health | — |
+| Kafdrop (Kafka UI) | http://localhost:9000 | — |
+| **Grafana** | http://localhost:3000 | admin / admin |
+
+---
+
+### Запуск только части сервисов
+
+```bash
+# Только БД + кэш (минимум для разработки без Kafka)
+docker-compose up -d postgres redis
+
+# С Kafka (для тестирования событий)
+docker-compose up -d postgres redis zookeeper kafka kafdrop
+
+# Только стек мониторинга (если инфра уже запущена)
+docker-compose up -d loki grafana
+```
+
+---
+
+### Просмотр логов в Grafana
+
+1. Открыть **http://localhost:3000** (admin / admin)
+2. В левом меню: **Explore** (иконка компаса 🧭)
+3. В выпадающем списке вверху выбрать **Loki** — он уже добавлен автоматически
+4. В поле запроса ввести: `{app="pet-hospital"}`
+5. Нажать **Run query**
+
+**Полезные LogQL-запросы:**
+
+```logql
+# Все логи приложения
+{app="pet-hospital"}
+
+# Только ошибки
+{app="pet-hospital"} |= "ERROR"
+
+# Логи конкретного сервиса
+{app="pet-hospital"} |= "PatientServiceImpl"
+
+# Найти исключения
+{app="pet-hospital"} |= "Exception"
+
+# AOP-логи — замер времени выполнения
+{app="pet-hospital"} |= "Completed"
+
+# Только WARN и выше
+{app="pet-hospital", level=~"WARN|ERROR"}
+```
+
+---
+
+### Остановка
+
+```bash
+# Остановить контейнеры, данные сохраняются в volumes
+docker-compose down
+
+# Остановить и полностью удалить все данные
+docker-compose down -v
+```
+
+---
 
 ### Первый вход
 
-После старта `DataInitializer` автоматически создаёт администратора:
+`DataInitializer` создаёт администратора автоматически:
 
 ```
 Логин:   admin
@@ -1654,17 +1759,36 @@ mvn test -Dtest="AuthIntegrationTest,PatientIntegrationTest"
 Роль:    ROLE_ADMIN
 ```
 
-Получить токен:
+Для создания врача или медсестры — зарегистрироваться через http://localhost:8080/register.html.
+По умолчанию все новые пользователи получают роль `ROLE_NURSE`.
+Сменить роль можно только напрямую в БД или через SQL-запрос.
+
+**Получить JWT-токен через curl:**
 ```bash
 curl -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin123"}'
 ```
 
-Использовать токен:
+**Использовать токен:**
 ```bash
 curl http://localhost:8080/api/patients \
   -H "Authorization: Bearer <token>"
+```
+
+---
+
+### Запуск тестов
+
+```bash
+# Все тесты (нужен Docker Desktop с открытым TCP 2375)
+mvn test
+
+# Только юнит-тесты (Docker не нужен)
+mvn test -Dtest="PatientServiceTest,WardServiceTest,AdminServiceTest,JwtUtilTest"
+
+# Только интеграционные тесты
+mvn test -Dtest="AuthIntegrationTest,PatientIntegrationTest"
 ```
 
 ---
@@ -1757,6 +1881,208 @@ spring:
 | Аудит смены палаты | `WardOccupationHistory` | — |
 | Идемпотентность Kafka-событий | `OutboxEvent.eventId` + проверка в консьюмере | — |
 | Транзакционность Kafka | `transaction-id-prefix: tx-hospital-` | — |
+
+---
+
+---
+
+## 26. Ролевой интерфейс — фронтенд
+
+### Обзор
+
+Фронтенд — SPA на чистом JS/HTML (без фреймворков). Один файл `index.html` адаптируется под роль текущего пользователя. При входе роль из JWT сохраняется в `localStorage`. После загрузки страницы вызывается `applyRoleVisibility()` — функция скрывает все элементы с `data-show-roles`, если текущая роль не входит в список разрешённых.
+
+### Матрица доступа
+
+| Функция | ADMIN | DOCTOR | NURSE |
+|---|---|---|---|
+| Дашборд | ✓ | ✓ | ✓ |
+| Пациенты — просмотр | ✓ | ✓ | ✓ |
+| Пациенты — добавить | ✓ | ✓ | ✗ |
+| Пациенты — удалить | ✓ | ✗ | ✗ |
+| Пациенты — назначить врача | ✓ | ✓ | ✗ |
+| Пациенты — услуги | ✓ | ✓ | ✓ |
+| Врачи — просмотр | ✓ | ✓ | ✓ |
+| Врачи — добавить / удалить | ✓ | ✗ | ✗ |
+| Отделения — просмотр | ✓ | ✓ | ✗ |
+| Отделения — добавить / удалить | ✓ | ✗ | ✗ |
+| Палаты — просмотр | ✓ | ✓ | ✓ |
+| Палаты — добавить новую | ✓ | ✗ | ✗ |
+| Палаты — заселить пациента | ✓ | ✓ | ✓ |
+| Платные услуги — просмотр | ✓ | ✓ | ✓ |
+| Платные услуги — добавить | ✓ | ✗ | ✗ |
+| Администрация (отчёты + выписка) | ✓ | ✗ | ✗ |
+
+### Как реализовано
+
+**HTML** — кнопки и пункты меню помечены атрибутом `data-show-roles`:
+
+```html
+<!-- Кнопка видна только ADMIN -->
+<button data-show-roles="ROLE_ADMIN" onclick="...">+ Добавить врача</button>
+
+<!-- Пункт меню для ADMIN и DOCTOR -->
+<a data-show-roles="ROLE_ADMIN,ROLE_DOCTOR" onclick="navigate('departments')">Отделения</a>
+```
+
+**JavaScript** — функция применяет видимость по роли при загрузке:
+
+```javascript
+function applyRoleVisibility() {
+  document.querySelectorAll('[data-show-roles]').forEach(el => {
+    const allowed = el.dataset.showRoles.split(',');
+    if (!allowed.includes(currentRole)) el.style.display = 'none';
+  });
+}
+```
+
+Кнопки в динамических таблицах рендерятся условно через `canDo()`:
+
+```javascript
+const PERMISSIONS = {
+  'patient:delete':        ['ROLE_ADMIN'],
+  'patient:assign-doctor': ['ROLE_ADMIN', 'ROLE_DOCTOR'],
+  'doctor:manage':         ['ROLE_ADMIN'],
+  // ...
+};
+
+function canDo(action) {
+  const allowed = PERMISSIONS[action];
+  return !allowed || allowed.includes(currentRole);
+}
+
+// В шаблоне строки таблицы пациентов:
+${canDo('patient:assign-doctor') ? `<button onclick="openAssignDoctorModal(${p.id})">👨‍⚕️</button>` : ''}
+${canDo('patient:delete')        ? `<button onclick="deletePatient(${p.id})">🗑</button>` : ''}
+```
+
+Попытка перейти в недоступный раздел через JS-консоль блокируется функцией `navigate()`:
+
+```javascript
+const SECTION_ACCESS = {
+  departments: ['ROLE_ADMIN', 'ROLE_DOCTOR'],
+  admin:       ['ROLE_ADMIN'],
+};
+
+function navigate(section) {
+  const allowed = SECTION_ACCESS[section];
+  if (allowed && !allowed.includes(currentRole)) {
+    toast('Недостаточно прав для просмотра этого раздела', 'warning');
+    return;
+  }
+  // ...
+}
+```
+
+---
+
+## 27. Мониторинг: Loki + Grafana
+
+### Архитектура
+
+```
+Spring Boot App
+      |
+      | HTTP Push (loki4j Logback appender)
+      v
+  Loki :3100  ──── Grafana :3000
+(хранилище)        (визуализация)
+```
+
+Приложение отправляет логи **напрямую** в Loki через `loki-logback-appender`. Никакого Promtail, агентов или файловых хвостов — это обычный Logback-аппендер, интегрированный в `logback-spring.xml`.
+
+### Компоненты
+
+| Компонент | Версия | Порт | Назначение |
+|---|---|---|---|
+| Loki | 2.9.0 | 3100 | Хранилище и индексация логов |
+| Grafana | 10.2.3 | 3000 | LogQL-запросы, дашборды |
+| loki-logback-appender | 1.5.2 | — | Java-зависимость в pom.xml |
+
+### Конфигурация (logback-spring.xml)
+
+```xml
+<appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+    <http class="com.github.loki4j.logback.JavaHttpSender">
+        <url>${lokiUrl}/loki/api/v1/push</url>
+        <connectionTimeoutMs>5000</connectionTimeoutMs>
+        <requestTimeoutMs>5000</requestTimeoutMs>
+    </http>
+    <format>
+        <label>
+            <!-- Loki-метки для фильтрации -->
+            <pattern>app=pet-hospital,level=%level,logger=%logger{0}</pattern>
+        </label>
+        <message>
+            <pattern>level=%level logger=%logger{36} thread=%thread | %msg%n%ex{full}</pattern>
+        </message>
+    </format>
+    <verbose>false</verbose>
+    <drainOnStop>false</drainOnStop>
+</appender>
+
+<!-- Асинхронная обёртка — не блокирует основной поток -->
+<appender name="LOKI_ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+    <appender-ref ref="LOKI"/>
+    <queueSize>1000</queueSize>
+    <neverBlock>true</neverBlock>
+</appender>
+```
+
+### URL Loki
+
+URL читается из `application.yml` через Spring-проперти:
+
+```yaml
+logging:
+  loki:
+    url: ${LOKI_URL:http://localhost:3100}
+```
+
+Переменная `LOKI_URL` опциональна. При локальном запуске (приложение вне Docker) используется дефолт `localhost:3100` — Loki доступен через проброшенный порт. Если приложение запускается внутри Docker — передать `LOKI_URL=http://hospital-loki:3100`.
+
+### Grafana — автопровизионирование
+
+Datasource Loki добавляется автоматически при старте Grafana из файла:
+
+```
+monitoring/grafana/provisioning/datasources/loki.yml
+```
+
+Вручную ничего настраивать не нужно. После `docker-compose up -d grafana` — datasource уже доступен в Explore.
+
+### Структура файлов мониторинга
+
+```
+monitoring/
+├── loki-config.yml                          # конфиг Loki (storage, schema)
+└── grafana/
+    └── provisioning/
+        └── datasources/
+            └── loki.yml                     # автоподключение Loki в Grafana
+```
+
+### LogQL — полезные запросы
+
+```logql
+# Все логи приложения
+{app="pet-hospital"}
+
+# Только ошибки
+{app="pet-hospital"} |= "ERROR"
+
+# Логи конкретного сервиса (AOP логирует все сервисы)
+{app="pet-hospital"} |= "PatientServiceImpl"
+
+# Найти исключения
+{app="pet-hospital"} |= "Exception"
+
+# Время выполнения методов (AOP-аспект)
+{app="pet-hospital"} |= "Completed"
+
+# Kafka-события
+{app="pet-hospital"} |= "patient-events"
+```
 
 ---
 

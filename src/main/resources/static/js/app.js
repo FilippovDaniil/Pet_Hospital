@@ -6,6 +6,35 @@
 
 const API = '';  // same-origin; backend on :8080
 
+let currentRole = '';
+
+const SECTION_ACCESS = {
+  departments: ['ROLE_ADMIN', 'ROLE_DOCTOR'],
+  admin:       ['ROLE_ADMIN'],
+};
+
+const PERMISSIONS = {
+  'patient:add':           ['ROLE_ADMIN', 'ROLE_DOCTOR'],
+  'patient:delete':        ['ROLE_ADMIN'],
+  'patient:assign-doctor': ['ROLE_ADMIN', 'ROLE_DOCTOR'],
+  'doctor:manage':         ['ROLE_ADMIN'],
+  'department:manage':     ['ROLE_ADMIN'],
+  'ward:manage':           ['ROLE_ADMIN'],
+  'service:manage':        ['ROLE_ADMIN'],
+};
+
+function canDo(action) {
+  const allowed = PERMISSIONS[action];
+  return !allowed || allowed.includes(currentRole);
+}
+
+function applyRoleVisibility() {
+  document.querySelectorAll('[data-show-roles]').forEach(el => {
+    const allowed = el.dataset.showRoles.split(',');
+    if (!allowed.includes(currentRole)) el.style.display = 'none';
+  });
+}
+
 // ---- Utils ----
 
 const $ = id => document.getElementById(id);
@@ -107,6 +136,11 @@ function buildPagination(containerId, pageData, onPageChange) {
 // ---- Navigation ----
 
 function navigate(section) {
+  const sectionAllowed = SECTION_ACCESS[section];
+  if (sectionAllowed && !sectionAllowed.includes(currentRole)) {
+    toast('Недостаточно прав для просмотра этого раздела', 'warning');
+    return;
+  }
   document.querySelectorAll('.section-page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
   const page = $(`page-${section}`);
@@ -206,9 +240,9 @@ async function loadPatients(page = 0) {
           <td>${escapeHtml(p.currentDoctorName)}</td>
           <td>${escapeHtml(p.currentWardNumber)}</td>
           <td>
-            <button class="btn btn-outline btn-sm btn-icon" title="Назначить врача" onclick="openAssignDoctorModal(${p.id})">👨‍⚕️</button>
+            ${canDo('patient:assign-doctor') ? `<button class="btn btn-outline btn-sm btn-icon" title="Назначить врача" onclick="openAssignDoctorModal(${p.id})">👨‍⚕️</button>` : ''}
             <button class="btn btn-outline btn-sm btn-icon" title="Услуги" onclick="openPatientServicesModal(${p.id}, '${escapeHtml(p.fullName)}')">🧾</button>
-            <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="deletePatient(${p.id})">🗑</button>
+            ${canDo('patient:delete') ? `<button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="deletePatient(${p.id})">🗑</button>` : ''}
           </td>
         </tr>`).join('');
 
@@ -249,9 +283,9 @@ async function searchPatients(page = 0) {
           <td>${escapeHtml(p.currentDoctorName)}</td>
           <td>${escapeHtml(p.currentWardNumber)}</td>
           <td>
-            <button class="btn btn-outline btn-sm btn-icon" title="Назначить врача" onclick="openAssignDoctorModal(${p.id})">👨‍⚕️</button>
+            ${canDo('patient:assign-doctor') ? `<button class="btn btn-outline btn-sm btn-icon" title="Назначить врача" onclick="openAssignDoctorModal(${p.id})">👨‍⚕️</button>` : ''}
             <button class="btn btn-outline btn-sm btn-icon" title="Услуги" onclick="openPatientServicesModal(${p.id}, '${escapeHtml(p.fullName)}')">🧾</button>
-            <button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="deletePatient(${p.id})">🗑</button>
+            ${canDo('patient:delete') ? `<button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="deletePatient(${p.id})">🗑</button>` : ''}
           </td>
         </tr>`).join('');
 
@@ -383,7 +417,7 @@ async function loadDoctors(page = 0) {
           <td>${escapeHtml(d.departmentName)}</td>
           <td>
             ${activeBadge(d.active)}
-            <button class="btn btn-danger btn-sm btn-icon" style="margin-left:6px" onclick="deleteDoctor(${d.id})">🗑</button>
+            ${canDo('doctor:manage') ? `<button class="btn btn-danger btn-sm btn-icon" style="margin-left:6px" onclick="deleteDoctor(${d.id})">🗑</button>` : ''}
           </td>
         </tr>`).join('');
 
@@ -451,7 +485,7 @@ async function loadDepartments() {
           <td>${escapeHtml(d.location)}</td>
           <td>
             ${escapeHtml(d.headDoctorName)}
-            <button class="btn btn-danger btn-sm btn-icon" style="margin-left:8px" onclick="deleteDepartment(${d.id})">🗑</button>
+            ${canDo('department:manage') ? `<button class="btn btn-danger btn-sm btn-icon" style="margin-left:8px" onclick="deleteDepartment(${d.id})">🗑</button>` : ''}
           </td>
         </tr>`).join('');
 }
@@ -690,9 +724,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const fullName = localStorage.getItem('fullName') || localStorage.getItem('username') || '';
-  const role = localStorage.getItem('role') || '';
+  currentRole = localStorage.getItem('role') || '';
   if ($('user-name'))  $('user-name').textContent  = fullName;
-  if ($('role-badge')) $('role-badge').textContent = roleLabel(role);
+  if ($('role-badge')) $('role-badge').textContent = roleLabel(currentRole);
 
+  applyRoleVisibility();
   navigate('dashboard');
 });

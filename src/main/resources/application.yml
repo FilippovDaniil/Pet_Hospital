@@ -93,5 +93,7 @@ jwt:
 logging:
   level:
     com.hospital: DEBUG
-    org.springframework.kafka: DEBUG
+    org.springframework.kafka: INFO
     org.apache.kafka: WARN
+  loki:
+    url: ${LOKI_URL:http://localhost:3100}
