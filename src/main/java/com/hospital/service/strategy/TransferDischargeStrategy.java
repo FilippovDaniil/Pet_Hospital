@@ -6,7 +6,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * Patient is transferred to another facility; status becomes TRANSFERRED and doctor is unlinked.
+ * Стратегия выписки с переводом в другое медицинское учреждение.
+ *
+ * Применяется когда пациент переводится в другую больницу, специализированную клинику
+ * или реабилитационный центр.
+ *
+ * Ключевое отличие от NormalDischargeStrategy:
+ *   - Статус устанавливается TRANSFERRED, а не DISCHARGED.
+ *   Это позволяет в отчётах различать пациентов "выписан домой" и "переведён".
+ *
+ * В расширенной версии системы здесь можно добавить:
+ *   - Указание принимающего учреждения
+ *   - Автоматическое создание выписки (discharge summary)
+ *   - Уведомление принимающего учреждения через внешний API
  */
 @Component
 @Slf4j
@@ -20,7 +32,8 @@ public class TransferDischargeStrategy implements DischargeStrategy {
     @Override
     public void discharge(Patient patient) {
         log.info("Transfer discharge for patient id={}", patient.getId());
+        // TRANSFERRED отличается от DISCHARGED: пациент ушёл не домой, а в другое учреждение
         patient.setStatus(PatientStatus.TRANSFERRED);
-        patient.setCurrentDoctor(null);
+        patient.setCurrentDoctor(null); // врач нашей клиники больше не ведёт пациента
     }
 }
