@@ -141,4 +141,14 @@ public class Patient {
     @Column(nullable = false)
     @Builder.Default
     private boolean active = true;
+
+    /**
+     * Учётная запись клиентского портала, связанная с этим пациентом.
+     * Nullable — не все пациенты зарегистрированы на портале.
+     * Позволяет клиенту видеть свои медицинские документы и историю.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "client_user_id")
+    @ToString.Exclude
+    private User clientUser;
 }

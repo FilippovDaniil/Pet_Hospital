@@ -156,15 +156,26 @@ public class SecurityConfig {
                 // Запись на приём и заказы — только для клиентов (ROLE_CLIENT)
                 .requestMatchers("/api/client/**").hasRole("CLIENT")
 
+                // Чат поддержки: POST создаёт/получает комнату для клиента, GET — список для админа
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/chat/support").hasRole("CLIENT")
+                .requestMatchers(org.springframework.http.HttpMethod.GET,  "/api/chat/support").hasRole("ADMIN")
+                // Чат клиента с врачом
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/chat/doctor/**").hasRole("CLIENT")
+                .requestMatchers("/api/chat/doctor/rooms").hasRole("DOCTOR")
+                .requestMatchers("/api/chat/my-rooms").hasRole("CLIENT")
+                // Сообщения — доступны всем аутентифицированным участникам (проверка в сервисе)
+                .requestMatchers("/api/chat/rooms/**").authenticated()
+
+                // Медицинские документы и история
+                .requestMatchers(org.springframework.http.HttpMethod.POST,
+                        "/api/medical/documents", "/api/medical/notes").hasRole("DOCTOR")
+                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                        "/api/medical/documents/patient/**", "/api/medical/history/patient/**").hasRole("DOCTOR")
+                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                        "/api/medical/documents/my", "/api/medical/history/my").hasRole("CLIENT")
+
                 /**
                  * hasRole("ADMIN") — требует роль ADMIN у аутентифицированного пользователя.
-                 *
-                 * ВАЖНО: Spring Security автоматически добавляет префикс "ROLE_" к имени роли.
-                 * То есть hasRole("ADMIN") проверяет наличие authority "ROLE_ADMIN" у пользователя.
-                 * В базе данных у нас хранится Role.ROLE_ADMIN, что соответствует этому.
-                 *
-                 * Если пользователь аутентифицирован, но роли ADMIN нет — вернётся 403 Forbidden.
-                 * Если пользователь вообще не аутентифицирован — вернётся 401 Unauthorized.
                  */
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
 

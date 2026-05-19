@@ -87,4 +87,11 @@ public interface DoctorRepository extends JpaRepository<Doctor, Long> {
 
     @Query("SELECT d FROM Doctor d JOIN FETCH d.department WHERE d.active = true ORDER BY d.department.name, d.fullName")
     List<Doctor> findAllActiveDoctorsWithDepartment();
+
+    /** Найти врача по привязанному пользователю (для чата и медицинских документов). */
+    Optional<Doctor> findByLinkedUserIdAndActiveTrue(Long linkedUserId);
+
+    /** Все активные врачи, у которых есть аккаунт в HIS (для возможности чата). */
+    @Query("SELECT d FROM Doctor d JOIN FETCH d.department WHERE d.active = true AND d.linkedUser IS NOT NULL ORDER BY d.fullName")
+    List<Doctor> findAllWithLinkedUser();
 }

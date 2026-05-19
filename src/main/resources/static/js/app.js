@@ -11,12 +11,14 @@ let currentRole = '';
 const SECTION_ACCESS = {
   departments: ['ROLE_ADMIN', 'ROLE_DOCTOR'],
   admin:       ['ROLE_ADMIN'],
+  chats:       ['ROLE_ADMIN', 'ROLE_DOCTOR'],
 };
 
 const PERMISSIONS = {
   'patient:add':           ['ROLE_ADMIN', 'ROLE_DOCTOR'],
   'patient:delete':        ['ROLE_ADMIN'],
   'patient:assign-doctor': ['ROLE_ADMIN', 'ROLE_DOCTOR'],
+  'patient:history':       ['ROLE_DOCTOR'],
   'doctor:manage':         ['ROLE_ADMIN'],
   'department:manage':     ['ROLE_ADMIN'],
   'ward:manage':           ['ROLE_ADMIN'],
@@ -75,6 +77,7 @@ async function api(path, options = {}) {
 }
 
 function logout() {
+  stopChatPoll();
   localStorage.clear();
   window.location.href = '/login.html';
 }
@@ -147,24 +150,28 @@ function navigate(section) {
   if (page) page.classList.add('active');
   const link = document.querySelector(`[data-nav="${section}"]`);
   if (link) link.classList.add('active');
+  if (section !== 'chats') stopChatPoll();
+
   $('topbarTitle').textContent = {
-    dashboard: 'Дашборд',
-    patients: 'Пациенты',
-    doctors: 'Врачи',
+    dashboard:   'Дашборд',
+    patients:    'Пациенты',
+    doctors:     'Врачи',
     departments: 'Отделения',
-    wards: 'Палаты',
-    services: 'Платные услуги',
-    admin: 'Администрация',
+    wards:       'Палаты',
+    services:    'Платные услуги',
+    admin:       'Администрация',
+    chats:       'Чаты',
   }[section] || section;
 
   const loaders = {
-    dashboard: loadDashboard,
-    patients: () => loadPatients(0),
-    doctors: () => loadDoctors(0),
+    dashboard:   loadDashboard,
+    patients:    () => loadPatients(0),
+    doctors:     () => loadDoctors(0),
     departments: loadDepartments,
-    wards: loadWards,
-    services: () => loadServices(0),
-    admin: loadAdmin,
+    wards:       loadWards,
+    services:    () => loadServices(0),
+    admin:       loadAdmin,
+    chats:       loadChats,
   };
   if (loaders[section]) loaders[section]();
 }
@@ -242,6 +249,7 @@ async function loadPatients(page = 0) {
           <td>
             ${canDo('patient:assign-doctor') ? `<button class="btn btn-outline btn-sm btn-icon" title="Назначить врача" onclick="openAssignDoctorModal(${p.id})">👨‍⚕️</button>` : ''}
             <button class="btn btn-outline btn-sm btn-icon" title="Услуги" onclick="openPatientServicesModal(${p.id}, '${escapeHtml(p.fullName)}')">🧾</button>
+            ${canDo('patient:history') ? `<button class="btn btn-outline btn-sm btn-icon" title="История пациента" onclick="openPatientHistoryModal(${p.id})">📋</button>` : ''}
             ${canDo('patient:delete') ? `<button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="deletePatient(${p.id})">🗑</button>` : ''}
           </td>
         </tr>`).join('');
@@ -285,6 +293,7 @@ async function searchPatients(page = 0) {
           <td>
             ${canDo('patient:assign-doctor') ? `<button class="btn btn-outline btn-sm btn-icon" title="Назначить врача" onclick="openAssignDoctorModal(${p.id})">👨‍⚕️</button>` : ''}
             <button class="btn btn-outline btn-sm btn-icon" title="Услуги" onclick="openPatientServicesModal(${p.id}, '${escapeHtml(p.fullName)}')">🧾</button>
+            ${canDo('patient:history') ? `<button class="btn btn-outline btn-sm btn-icon" title="История пациента" onclick="openPatientHistoryModal(${p.id})">📋</button>` : ''}
             ${canDo('patient:delete') ? `<button class="btn btn-danger btn-sm btn-icon" title="Удалить" onclick="deletePatient(${p.id})">🗑</button>` : ''}
           </td>
         </tr>`).join('');
@@ -709,6 +718,282 @@ async function doDischarge() {
     toast(`Пациент выписан (${type})`);
     closeModal('modal-discharge');
     loadAdmin();
+  } catch (_) {}
+}
+
+// =============================================
+// CHATS (Admin: support; Doctor: patient chats)
+// =============================================
+
+let activeChatRoomId = null;
+let chatPollTimer = null;
+let chatLastMsgId = 0;
+
+async function loadChats() {
+  const isAdmin = currentRole === 'ROLE_ADMIN';
+  const url = isAdmin ? '/api/chat/support' : '/api/chat/doctor/rooms';
+  const titleEl = $('chats-panel-title');
+  if (titleEl) titleEl.textContent = isAdmin ? 'Чаты поддержки' : 'Чаты с пациентами';
+
+  const rooms = await api(url);
+  if (!rooms) return;
+
+  const listEl = $('chat-rooms-list');
+  if (!listEl) return;
+
+  if (rooms.length === 0) {
+    listEl.innerHTML = '<div class="empty-state" style="padding:24px">Чатов нет</div>';
+    return;
+  }
+
+  listEl.innerHTML = rooms.map(r => {
+    const name = escapeHtml(r.clientUserName || '—');
+    const staff = escapeHtml(r.staffUserName || 'Поддержка');
+    const displayName = isAdmin ? name : name;
+    const sub = isAdmin ? `Клиент: ${name}` : `Пациент: ${name}`;
+    const preview = r.lastMessage
+      ? escapeHtml(r.lastMessage.substring(0, 48)) + (r.lastMessage.length > 48 ? '…' : '')
+      : '<em style="color:#94a3b8">Нет сообщений</em>';
+    const unreadBadge = r.unreadCount > 0
+      ? `<span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 7px;font-size:.7rem;font-weight:700">${r.unreadCount}</span>`
+      : '';
+    const isActive = activeChatRoomId === r.id;
+    return `
+      <div onclick="openChat(${r.id},'${name.replace(/'/g,'\\\'')}')"
+           style="padding:10px 12px;border:1px solid ${isActive ? '#93c5fd' : '#e2e8f0'};border-radius:8px;
+                  cursor:pointer;margin-bottom:6px;background:${isActive ? '#eff6ff' : '#fff'};transition:background .12s"
+           onmouseenter="this.style.background='#f8fafc'"
+           onmouseleave="this.style.background='${isActive ? '#eff6ff' : '#fff'}'">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
+          <span style="font-weight:600;font-size:.875rem">${displayName}</span>
+          ${unreadBadge}
+        </div>
+        <div style="font-size:.78rem;color:#94a3b8;margin-top:2px">${preview}</div>
+      </div>`;
+  }).join('');
+}
+
+async function openChat(roomId, label) {
+  stopChatPoll();
+  activeChatRoomId = roomId;
+  chatLastMsgId = 0;
+
+  const titleEl = $('chat-active-title');
+  if (titleEl) titleEl.textContent = label;
+
+  const area = $('chat-messages-area');
+  area.innerHTML = '<div style="text-align:center;padding:32px"><div class="spinner"></div></div>';
+
+  const inputArea = $('chat-input-area');
+  if (inputArea) inputArea.style.display = 'flex';
+
+  const msgs = await api(`/api/chat/rooms/${roomId}/messages`);
+  if (!msgs) return;
+
+  renderChatMessages(msgs, true);
+  if (msgs.length > 0) chatLastMsgId = msgs[msgs.length - 1].id;
+
+  startChatPoll();
+  loadChats();
+}
+
+function renderChatMessages(msgs, replace) {
+  const area = $('chat-messages-area');
+  const myName = localStorage.getItem('fullName') || '';
+
+  if (replace) {
+    if (msgs.length === 0) {
+      area.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:48px 0">Нет сообщений. Начните диалог!</div>';
+      return;
+    }
+    area.innerHTML = msgs.map(m => chatBubble(m, myName)).join('');
+  } else {
+    msgs.forEach(m => {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = chatBubble(m, myName);
+      area.appendChild(wrap.firstElementChild);
+    });
+  }
+  area.scrollTop = area.scrollHeight;
+}
+
+function chatBubble(m, myName) {
+  const mine = m.senderName === myName;
+  const justify = mine ? 'flex-end' : 'flex-start';
+  const bg    = mine ? '#1a6fc4' : '#f1f5f9';
+  const color = mine ? '#fff'    : '#1e293b';
+  const sub   = mine ? 'rgba(255,255,255,.65)' : '#94a3b8';
+  const radius = mine ? '12px 12px 3px 12px' : '12px 12px 12px 3px';
+  const time = m.sentAt ? new Date(m.sentAt).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : '';
+  const content = escapeHtml(m.content || '');
+
+  return `
+    <div style="display:flex;justify-content:${justify};margin-bottom:10px">
+      <div style="max-width:68%;background:${bg};color:${color};padding:8px 12px;border-radius:${radius};word-break:break-word">
+        ${!mine ? `<div style="font-size:.72rem;font-weight:700;color:${sub};margin-bottom:3px">${escapeHtml(m.senderName || '')}</div>` : ''}
+        <div style="white-space:pre-wrap">${content}</div>
+        <div style="font-size:.68rem;color:${sub};text-align:right;margin-top:3px">${time}</div>
+      </div>
+    </div>`;
+}
+
+function startChatPoll() {
+  stopChatPoll();
+  chatPollTimer = setInterval(async () => {
+    if (!activeChatRoomId) return;
+    try {
+      const msgs = await api(`/api/chat/rooms/${activeChatRoomId}/messages/poll?sinceId=${chatLastMsgId}`);
+      if (msgs && msgs.length > 0) {
+        renderChatMessages(msgs, false);
+        chatLastMsgId = msgs[msgs.length - 1].id;
+      }
+    } catch (_) {}
+  }, 3000);
+}
+
+function stopChatPoll() {
+  if (chatPollTimer) { clearInterval(chatPollTimer); chatPollTimer = null; }
+}
+
+async function sendChatMsg() {
+  if (!activeChatRoomId) return;
+  const input = $('chat-msg-input');
+  const content = input?.value?.trim();
+  if (!content) return;
+  input.value = '';
+  try {
+    const msg = await api(`/api/chat/rooms/${activeChatRoomId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+    if (msg) {
+      renderChatMessages([msg], false);
+      chatLastMsgId = msg.id;
+    }
+  } catch (_) {}
+}
+
+// =============================================
+// PATIENT HISTORY (Doctor)
+// =============================================
+
+function showHistTab(tab) {
+  ['notes', 'docs'].forEach(t => {
+    const content = $(`hist-tab-${t}`);
+    const btn     = $(`hist-tab-btn-${t}`);
+    if (!content || !btn) return;
+    const active = t === tab;
+    content.style.display = active ? '' : 'none';
+    btn.style.color       = active ? '#1a6fc4' : '#64748b';
+    btn.style.fontWeight  = active ? '600' : '500';
+    btn.style.borderBottom = active ? '2px solid #1a6fc4' : 'none';
+    btn.style.marginBottom = active ? '-2px' : '0';
+  });
+}
+
+async function openPatientHistoryModal(patientId) {
+  $('hist-patient-id').value = patientId;
+  $('hist-patient-name').textContent = `#${patientId}`;
+  showHistTab('notes');
+  openModal('modal-patient-history');
+  await loadPatientHistory(patientId);
+}
+
+window.openPatientHistoryModal = openPatientHistoryModal;
+
+async function loadPatientHistory(patientId) {
+  const data = await api(`/api/medical/history/patient/${patientId}`);
+  if (!data) return;
+  $('hist-patient-name').textContent = data.patientName || `#${patientId}`;
+
+  const noteBg     = { DIAGNOSIS: '#fef2f2', OBSERVATION: '#f0fdf4', NOTE: '#eff6ff' };
+  const noteBorder = { DIAGNOSIS: '#fecaca', OBSERVATION: '#bbf7d0', NOTE: '#bfdbfe' };
+
+  $('hist-notes-list').innerHTML = data.notes.length === 0
+    ? '<div class="empty-state" style="padding:16px 0">Заметок нет</div>'
+    : data.notes.map(n => `
+        <div style="border:1px solid ${noteBorder[n.type]||'#e2e8f0'};background:${noteBg[n.type]||'#fff'};
+                    border-radius:8px;padding:12px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <span style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#475569">
+              ${escapeHtml(n.typeLabel)}
+            </span>
+            <span style="font-size:.72rem;color:#94a3b8">
+              ${n.createdAt ? new Date(n.createdAt).toLocaleDateString('ru') : ''}
+            </span>
+          </div>
+          <div style="margin-top:2px;font-size:.78rem;color:#64748b">Врач: ${escapeHtml(n.doctorName)}</div>
+          <div style="margin-top:8px;white-space:pre-wrap;color:#1e293b;font-size:.9rem">${escapeHtml(n.content)}</div>
+          ${!n.visibleToClient
+            ? '<div style="margin-top:4px;font-size:.72rem;color:#94a3b8">🔒 Не видна пациенту</div>'
+            : ''}
+        </div>`).join('');
+
+  $('hist-docs-list').innerHTML = data.documents.length === 0
+    ? '<div class="empty-state" style="padding:16px 0">Документов нет</div>'
+    : data.documents.map(d => `
+        <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:8px;
+                    background:${d.active ? '#fff' : '#f8fafc'}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+            <div>
+              <strong style="font-size:.9rem">${escapeHtml(d.title)}</strong>
+              <span style="font-size:.75rem;font-weight:600;padding:2px 8px;border-radius:4px;
+                           background:#dbeafe;color:#1d4ed8;margin-left:6px">${escapeHtml(d.typeLabel)}</span>
+            </div>
+            <span style="font-size:.72rem;color:#94a3b8;white-space:nowrap">
+              ${d.issuedAt ? new Date(d.issuedAt).toLocaleDateString('ru') : ''}
+            </span>
+          </div>
+          <div style="margin-top:2px;font-size:.78rem;color:#64748b">Врач: ${escapeHtml(d.doctorName)}</div>
+          <div style="margin-top:8px;white-space:pre-wrap;color:#475569;font-size:.875rem">${escapeHtml(d.content)}</div>
+          ${d.validUntil ? `<div style="margin-top:4px;font-size:.72rem;color:#64748b">Действителен до: ${escapeHtml(d.validUntil)}</div>` : ''}
+          ${!d.active ? '<span style="font-size:.72rem;color:#94a3b8">Недействителен</span>' : ''}
+        </div>`).join('');
+}
+
+async function savePatientNote() {
+  const patientId = $('hist-patient-id').value;
+  if (!patientId) return;
+  const content = $('note-content').value.trim();
+  if (!content) { toast('Введите содержание заметки', 'warning'); return; }
+  try {
+    await api('/api/medical/notes', {
+      method: 'POST',
+      body: JSON.stringify({
+        patientId: Number(patientId),
+        type: $('note-type').value,
+        content,
+        visibleToClient: $('note-visible').value === 'true',
+      }),
+    });
+    toast('Заметка добавлена');
+    $('note-content').value = '';
+    await loadPatientHistory(patientId);
+  } catch (_) {}
+}
+
+async function savePatientDoc() {
+  const patientId = $('hist-patient-id').value;
+  if (!patientId) return;
+  const title   = $('doc-title').value.trim();
+  const content = $('doc-content').value.trim();
+  if (!title || !content) { toast('Заполните название и содержание', 'warning'); return; }
+  try {
+    await api('/api/medical/documents', {
+      method: 'POST',
+      body: JSON.stringify({
+        patientId: Number(patientId),
+        type: $('doc-type').value,
+        title,
+        content,
+        validUntil: $('doc-valid-until').value || null,
+      }),
+    });
+    toast('Документ создан');
+    $('doc-title').value = '';
+    $('doc-content').value = '';
+    $('doc-valid-until').value = '';
+    await loadPatientHistory(patientId);
   } catch (_) {}
 }
 

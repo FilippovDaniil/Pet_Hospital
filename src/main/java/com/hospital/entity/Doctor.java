@@ -96,4 +96,14 @@ public class Doctor {
     @Column(nullable = false)
     @Builder.Default
     private boolean active = true;
+
+    /**
+     * Учётная запись HIS, связанная с этим врачом.
+     * Nullable — не все врачи имеют аккаунт в системе.
+     * Используется для определения, кому адресовать чат от пациента.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    @ToString.Exclude
+    private User linkedUser;
 }
