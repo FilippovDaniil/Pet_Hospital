@@ -1,6 +1,6 @@
 # Pet Hospital HIS — Claude Code Guide
 
-Учебный проект: Hospital Information System на Spring Boot 3.2 с клиентским порталом.
+Учебный проект: Hospital Information System на Spring Boot 3.2 с клиентским порталом, чат-системой и медицинской документацией.
 
 ---
 
@@ -26,73 +26,102 @@ docker-compose up -d --build app  # пересобрать после измен
 ```
 src/main/java/com/hospital/
 ├── config/
-│   ├── SecurityConfig.java         # Spring Security + JWT, RBAC, CORS
-│   ├── JwtUtil.java                # генерация/валидация JWT (HS256, 24ч)
+│   ├── SecurityConfig.java             # Spring Security + JWT, RBAC, CORS
+│   ├── JwtUtil.java                    # генерация/валидация JWT (HS256, 24ч)
 │   ├── JwtAuthenticationFilter.java
-│   ├── KafkaConfig.java            # топики Kafka + @Primary JpaTransactionManager
-│   ├── CacheConfig.java            # Redis TTL=5мин
-│   ├── AopLoggingAspect.java       # логирование времени всех сервисов
-│   └── DataInitializer.java        # создание 5 дефолтных пользователей
+│   ├── KafkaConfig.java                # топики Kafka + @Primary JpaTransactionManager
+│   ├── CacheConfig.java                # Redis TTL=5мин
+│   ├── AopLoggingAspect.java           # логирование времени всех сервисов
+│   └── DataInitializer.java            # создание 5 дефолтных пользователей
 │
 ├── controller/
-│   ├── AuthController.java         # /api/auth/login, /register, /register-client
-│   ├── ClientController.java       # /api/client/** (публичный + ROLE_CLIENT)
-│   ├── PatientController.java      # /api/patients
-│   ├── DoctorController.java       # /api/doctors
-│   ├── DepartmentController.java   # /api/departments
-│   ├── WardController.java         # /api/wards
-│   ├── PaidServiceController.java  # /api/paid-services
-│   └── AdminController.java        # /api/admin (ROLE_ADMIN only)
+│   ├── AuthController.java             # /api/auth/login, /register, /register-client
+│   ├── ClientController.java           # /api/client/** (публичный + ROLE_CLIENT)
+│   ├── PatientController.java          # /api/patients
+│   ├── DoctorController.java           # /api/doctors
+│   ├── DepartmentController.java       # /api/departments
+│   ├── WardController.java             # /api/wards
+│   ├── PaidServiceController.java      # /api/paid-services
+│   ├── AdminController.java            # /api/admin (ROLE_ADMIN only)
+│   ├── ChatController.java             # /api/chat/** — чаты поддержки и врача
+│   └── MedicalController.java          # /api/medical/** — документы и история
 │
 ├── service/
+│   ├── ChatService.java                # интерфейс: getOrCreate, send, poll, rooms
+│   ├── MedicalService.java             # интерфейс: createDocument, createNote, history
 │   ├── impl/
-│   │   ├── ClientServiceImpl.java  # логика клиентского портала
+│   │   ├── ClientServiceImpl.java
 │   │   ├── PatientServiceImpl.java
 │   │   ├── WardServiceImpl.java
-│   │   └── AdminServiceImpl.java
-│   ├── event/                      # Kafka события + консьюмеры
-│   └── strategy/                   # Strategy pattern для выписки пациентов
+│   │   ├── AdminServiceImpl.java
+│   │   ├── ChatServiceImpl.java        # short-polling, IDOR-защита через switch(role)
+│   │   └── MedicalServiceImpl.java     # @Transactional(readOnly) + override на write
+│   ├── event/                          # Kafka события + консьюмеры
+│   └── strategy/                       # Strategy pattern для выписки пациентов
 │
 ├── entity/
-│   ├── Appointment.java            # запись к врачу (клиентский портал)
-│   ├── ClientServiceOrder.java     # заказ услуги (клиентский портал)
-│   ├── Patient.java                # soft-delete, history tracking
-│   ├── Doctor.java
-│   ├── Department.java
+│   ├── ChatRoomType.java               # enum: SUPPORT, DOCTOR_CLIENT
+│   ├── MedicalDocumentType.java        # enum: PRESCRIPTION, REFERRAL, SICK_LEAVE, ...
+│   ├── PatientNoteType.java            # enum: DIAGNOSIS, OBSERVATION, NOTE
+│   ├── ChatRoom.java                   # staffUser nullable (null = любой admin)
+│   ├── ChatMessage.java                # read (не isRead!), id как cursor для polling
+│   ├── MedicalDocument.java            # soft-delete via active, validUntil nullable
+│   ├── PatientNote.java                # visibleToClient=false по умолчанию
+│   ├── Appointment.java                # запись к врачу (клиентский портал)
+│   ├── ClientServiceOrder.java         # заказ услуги (клиентский портал)
+│   ├── Patient.java                    # soft-delete, history tracking, clientUser FK
+│   ├── Doctor.java                     # linkedUser FK (для чата и меддокументов)
+│   ├── Department.java                 # НЕТ поля active — не делать фильтр ::isActive
 │   ├── Ward.java
 │   ├── PaidService.java
-│   ├── User.java                   # implements UserDetails
-│   ├── OutboxEvent.java            # идемпотентность Kafka
-│   └── *History.java               # аудит врачей и палат
+│   ├── User.java                       # implements UserDetails
+│   ├── OutboxEvent.java                # идемпотентность Kafka
+│   └── *History.java                   # аудит врачей и палат
 │
 ├── repository/
-│   ├── AppointmentRepository.java      # findByClientUserIdWithDetails()
+│   ├── ChatRoomRepository.java         # findByTypeAndClientUserId, partial unique index
+│   ├── ChatMessageRepository.java      # findByRoomIdAndIdGreaterThan (polling cursor)
+│   ├── MedicalDocumentRepository.java  # findByPatientId vs findByPatientClientUserId
+│   ├── PatientNoteRepository.java      # findByPatientId vs findVisibleByClientUserId
+│   ├── AppointmentRepository.java
 │   ├── ClientServiceOrderRepository.java
-│   └── DoctorRepository.java           # findAllActiveDoctorsWithDepartment()
+│   └── DoctorRepository.java           # findByLinkedUserIdAndActiveTrue
 │
 └── dto/
     ├── request/
-    │   ├── AppointmentRequest.java      # @NotNull doctorId, @Future preferredDate
+    │   ├── SendMessageRequest.java
+    │   ├── CreateMedicalDocumentRequest.java
+    │   ├── CreatePatientNoteRequest.java
+    │   ├── AppointmentRequest.java
     │   └── ServiceOrderRequest.java
     └── response/
+        ├── ChatRoomResponse.java        # unreadCount, lastMessage preview
+        ├── ChatMessageResponse.java     # senderId для bubble-alignment
+        ├── MedicalDocumentResponse.java # type + typeLabel (machine + human)
+        ├── PatientNoteResponse.java     # visibleToClient flag
+        ├── PatientHistoryResponse.java  # агрегат: notes + documents
         ├── AppointmentResponse.java
-        ├── ServiceOrderResponse.java    # + servicePrice BigDecimal
-        └── PublicDoctorResponse.java    # id, fullName, specialty, cabinet, dept
+        ├── ServiceOrderResponse.java
+        └── PublicDoctorResponse.java
 ```
 
 ```
 src/main/resources/
 ├── application.yml                 # defaults (localhost), port 8090
 ├── application-test.yml            # Testcontainers + EmbeddedKafka
+│                                   # + allow-bean-definition-overriding: true
 ├── db/migration/
 │   ├── V1__initial_schema.sql      # core schema
 │   ├── V2__test_data.sql           # базовые данные
 │   ├── V3__add_users.sql           # таблица users
 │   ├── V4__client_schema.sql       # appointment + client_service_order
-│   └── V5__extended_seed_data.sql  # ~45 пациентов, ~25 врачей, ~10 отделений
+│   ├── V5__extended_seed_data.sql  # ~45 пациентов, ~25 врачей, ~10 отделений
+│   └── V6__chat_medical_schema.sql # chat_room, chat_message, medical_document,
+│                                   # patient_note + partial unique indexes
 ├── logback-spring.xml              # loki4j appender (async)
 └── static/
-    ├── index.html                  # HIS SPA (персонал: admin/doctor/nurse)
+    ├── index.html                  # HIS SPA (admin: чаты+история; doctor: чаты+история)
+    ├── app.js                      # SECTION_ACCESS, loadChats, openPatientHistoryModal
     └── client.html                 # Клиентский портал (role: CLIENT)
 ```
 
@@ -117,16 +146,36 @@ src/main/resources/
 
 | Роль | Интерфейс | API-префикс |
 |---|---|---|
-| `ROLE_ADMIN` | index.html | `/api/admin/**`, все остальные |
-| `ROLE_DOCTOR` | index.html | `/api/patients/**`, `/api/doctors/**` |
+| `ROLE_ADMIN` | index.html | `/api/admin/**`, `GET /api/chat/support`, все остальные |
+| `ROLE_DOCTOR` | index.html | `/api/patients/**`, `/api/doctors/**`, `/api/medical/**` (write/read), `GET /api/chat/doctor/rooms` |
 | `ROLE_NURSE` | index.html | `/api/patients/**` (ограниченно) |
-| `ROLE_CLIENT` | client.html | `/api/client/**` (запись, заказы) |
+| `ROLE_CLIENT` | client.html | `/api/client/**`, `POST /api/chat/support`, `POST /api/chat/doctor/**`, `GET /api/chat/my-rooms`, `GET /api/medical/documents/my`, `GET /api/medical/history/my` |
 
 Публичный доступ без токена:
-- `GET /api/client/doctors`
-- `GET /api/client/departments`
-- `GET /api/client/services`
+- `GET /api/client/doctors`, `GET /api/client/departments`, `GET /api/client/services`
 - Статика: `/*.html`, `/css/**`, `/js/**`
+
+### Чат — SecurityConfig правила
+
+```
+POST /api/chat/support          → ROLE_CLIENT   (создать/получить комнату поддержки)
+GET  /api/chat/support          → ROLE_ADMIN    (список всех комнат поддержки)
+POST /api/chat/doctor/{userId}  → ROLE_CLIENT   (создать/получить комнату с врачом)
+GET  /api/chat/doctor/rooms     → ROLE_DOCTOR   (список чатов врача)
+GET  /api/chat/my-rooms         → ROLE_CLIENT   (все мои чаты)
+/api/chat/rooms/**              → authenticated (любой, доступ проверяет сервис)
+```
+
+### Медицина — SecurityConfig правила
+
+```
+POST /api/medical/documents                  → ROLE_DOCTOR
+POST /api/medical/notes                      → ROLE_DOCTOR
+GET  /api/medical/documents/patient/{id}     → ROLE_DOCTOR
+GET  /api/medical/history/patient/{id}       → ROLE_DOCTOR
+GET  /api/medical/documents/my               → ROLE_CLIENT
+GET  /api/medical/history/my                 → ROLE_CLIENT
+```
 
 ---
 
@@ -140,6 +189,8 @@ src/main/resources/
 
 В тестах аналогично через `TestTransactionConfig.java` (`@TestConfiguration`).
 
+**Конфликт двух @Primary в тестах**: `KafkaConfig.transactionManager` и `TestTransactionConfig.transactionManager` оба `@Primary`. Spring Boot 3.x по умолчанию запрещает переопределение бинов. Решение: `spring.main.allow-bean-definition-overriding: true` в `application-test.yml`.
+
 ### Kafka dual-listener
 
 ```
@@ -151,25 +202,102 @@ PLAINTEXT_HOST://localhost:9092 # для хоста
 
 ### Soft delete
 
-Пациенты не удаляются физически. `Patient.active = false`. Все запросы фильтруют по `active = true`.
+Пациенты, врачи, платные услуги и медицинские документы не удаляются физически.
+- `Patient.active = false`, `Doctor.active = false`, `MedicalDocument.active = false`
+- `Department` — НЕ имеет поля `active`. Нельзя использовать фильтр `Department::isActive`.
+
+### Chat: short-polling через id-cursor
+
+Чат работает без WebSocket. Клиент каждые 3 секунды вызывает:
+```
+GET /api/chat/rooms/{roomId}/messages/poll?sinceId={lastMessageId}
+```
+Репозиторий возвращает только сообщения с `id > sinceId`. При первом открытии `sinceId=0`.
+
+### Chat: orElseGet() обязателен в getOrCreate
+
+```java
+// ПРАВИЛЬНО: save() вызывается ТОЛЬКО если комнаты нет
+chatRoomRepository.findByTypeAndClientUserId(type, userId)
+    .orElseGet(() -> chatRoomRepository.save(newRoom));
+
+// НЕПРАВИЛЬНО: save() вызывается ВСЕГДА (до проверки Optional)
+chatRoomRepository.findByTypeAndClientUserId(type, userId)
+    .orElse(chatRoomRepository.save(newRoom));
+```
+
+### Chat: IDOR-защита в getAccessibleRoom
+
+Доступ к комнате проверяется через `switch(user.getRole())`:
+- `ROLE_CLIENT` → только если `room.getClientUser().getId() == user.getId()`
+- `ROLE_ADMIN` → любая комната
+- `ROLE_DOCTOR` → только если `room.getStaffUser()?.getId() == user.getId()`
+
+### MedicalDocument: два поля типа
+
+DTO содержит:
+- `type` (строка enum, напр. `"PRESCRIPTION"`) — для программной логики фронтенда
+- `typeLabel` (русское название, напр. `"Рецепт"`) — для отображения в UI
+
+### PatientNote: visibleToClient=false по умолчанию
+
+`@Builder.Default private boolean visibleToClient = false` — консервативная политика.
+Врач ЯВНО выбирает, что показать пациенту. Без явного `true` — запись скрыта.
+
+### V6-миграция: DataInitializer-порядок в тестах
+
+V6 содержит `UPDATE doctor SET user_id = (SELECT id FROM users WHERE username='doctor1') ...`
+Этот UPDATE выполняется на этапе Flyway-миграции. DataInitializer запускается ПОСЛЕ миграций.
+В момент миграции таблица `users` пустая → UPDATE — no-op.
+
+**Решение для интеграционных тестов**: в `@BeforeEach` через `JdbcTemplate`:
+```java
+jdbcTemplate.update(
+    "UPDATE doctor SET user_id = (SELECT id FROM users WHERE username = 'doctor1') " +
+    "WHERE full_name = 'Иванов Сергей Петрович'");
+```
+
+### Java 17 vs Java 21
+
+Проект компилируется под Java 17. Методы Java 21+ запрещены:
+- `List.getLast()` → использовать `list.get(list.size() - 1)`
+- `List.getFirst()` → использовать `list.get(0)`
 
 ---
 
 ## Migrations — важное
 
-- Новые миграции нумеруются строго: V6, V7, ... (Flyway не переименовывает применённые)
+- Новые миграции нумеруются строго: V7, V8, ... (Flyway не переименовывает применённые)
 - `ddl-auto: validate` — Hibernate ПРОВЕРЯЕТ схему, не создаёт. Расхождение entity/migration = падение при старте.
-- V5 использует subquery для ID отделений (не хардкодит числа), чтобы работать поверх разных состояний БД.
+- V5 использует subquery для ID отделений (не хардкодит числа).
+- V6 добавляет: `chat_room`, `chat_message`, `medical_document`, `patient_note`.
+  - Partial unique indexes для идемпотентности getOrCreate:
+    ```sql
+    CREATE UNIQUE INDEX uq_support_room ON chat_room(client_user_id)
+        WHERE type = 'SUPPORT';
+    CREATE UNIQUE INDEX uq_doctor_room ON chat_room(client_user_id, staff_user_id)
+        WHERE type = 'DOCTOR_CLIENT';
+    ```
 
 ---
 
 ## Тесты
 
 ```bash
-mvn test                            # все тесты (нужен Docker TCP 2375)
-mvn test -Dtest="PatientServiceTest,WardServiceTest,AdminServiceTest,JwtUtilTest"  # только юнит
-mvn test -Dtest="AuthIntegrationTest,PatientIntegrationTest"                       # только интеграционные
+# Через IntelliJ bundled Maven (если mvn не в PATH):
+"C:\Program Files\JetBrains\IntelliJ IDEA 2025.2.4\plugins\maven\lib\maven3\bin\mvn.cmd" test
+
+# Только юнит-тесты (без Docker):
+mvn test -Dtest="PatientServiceTest,WardServiceTest,AdminServiceTest,JwtUtilTest,ChatServiceTest,MedicalServiceTest"
+
+# Только интеграционные (нужен Docker TCP 2375):
+mvn test -Dtest="AuthIntegrationTest,PatientIntegrationTest,ChatIntegrationTest,MedicalIntegrationTest"
+
+# Все тесты:
+mvn test
 ```
+
+**Итого: 193 теста — 70 юнит + 57 интеграционных + 66 из предыдущих сессий**
 
 **Windows**: Docker Desktop → Settings → General → "Expose daemon on tcp://localhost:2375 without TLS"
 
@@ -178,6 +306,30 @@ mvn test -Dtest="AuthIntegrationTest,PatientIntegrationTest"                    
 - EmbeddedKafka (`spring.embedded.kafka.brokers`)
 - Redis отключён (`cache.type: none`)
 - Kafka-транзакции отключены (`transaction-id-prefix: ""`)
+- `spring.main.allow-bean-definition-overriding: true` (иначе конфликт двух @Primary transactionManager)
+
+### Список тест-классов
+
+| Класс | Тип | Тестов | Что покрывает |
+|---|---|---|---|
+| `JwtUtilTest` | Юнит | 5 | Генерация/валидация JWT |
+| `AdminServiceTest` | Юнит | 9 | Выписка пациентов, Strategy pattern |
+| `PatientServiceTest` | Юнит | 10 | CRUD пациентов, soft-delete |
+| `WardServiceTest` | Юнит | 5 | Размещение в палате |
+| `ChatServiceTest` | Юнит | 20 | Все методы ChatServiceImpl, IDOR |
+| `MedicalServiceTest` | Юнит | 21 | Все методы MedicalServiceImpl, типы/labels |
+| `AuthIntegrationTest` | Интеграционный | 10 | Логин, регистрация, 401/403 |
+| `PatientIntegrationTest` | Интеграционный | 8 | CRUD пациентов через HTTP |
+| `ChatIntegrationTest` | Интеграционный | 13 | RBAC чата, идемпотентность, send+poll |
+| `MedicalIntegrationTest` | Интеграционный | 23 | RBAC медицины, создание, e2e |
+
+### Особенности тестирования на Windows
+
+`MockMvcResult.getResponse().getContentAsString()` по умолчанию использует системную кодировку (CP-1252 на Windows).
+При сравнении кириллических строк кодировка искажается. Всегда использовать:
+```java
+response.getContentAsString(StandardCharsets.UTF_8)
+```
 
 ---
 
@@ -214,31 +366,57 @@ mvn test -Dtest="AuthIntegrationTest,PatientIntegrationTest"                    
 | Метод | URL | Доступ | Описание |
 |---|---|---|---|
 | GET | `/api/client/doctors` | permitAll | Активные врачи с отделениями |
-| GET | `/api/client/departments` | permitAll | Активные отделения |
+| GET | `/api/client/departments` | permitAll | Все отделения |
 | GET | `/api/client/services` | permitAll | Активные платные услуги |
 | POST | `/api/client/appointments` | ROLE_CLIENT | Создать запись к врачу |
 | GET | `/api/client/appointments/my` | ROLE_CLIENT | Записи текущего пользователя |
 | POST | `/api/client/service-orders` | ROLE_CLIENT | Создать заказ услуги |
 | GET | `/api/client/service-orders/my` | ROLE_CLIENT | Заказы текущего пользователя |
 
-### AppointmentRequest
-
-```json
-{
-  "doctorId": 1,
-  "preferredDate": "2026-06-15",
-  "preferredTime": "14:00",
-  "contactPhone": "+7-999-123-45-67",
-  "notes": "Первичный приём"
-}
-```
-
 ### Статусы
 
 - `Appointment`: `PENDING` → `CONFIRMED` / `CANCELLED`
 - `ClientServiceOrder`: `PENDING` → `CONFIRMED` → `COMPLETED` / `CANCELLED`
 
-Смена статусов — через прямые SQL-запросы или будущий admin-API.
+---
+
+## Чат-система — детали
+
+### Типы комнат
+
+| Тип | staffUser | Кто может отвечать |
+|---|---|---|
+| `SUPPORT` | `null` | любой ROLE_ADMIN |
+| `DOCTOR_CLIENT` | конкретный User врача | только этот врач |
+
+### AppointmentRequest для чата с врачом
+
+```
+POST /api/chat/doctor/{doctorUserId}
+```
+`doctorUserId` — это `users.id` (не `doctor.id`). Врач идентифицируется по учётной записи.
+
+---
+
+## Медицинская документация — детали
+
+### Типы документов (MedicalDocumentType)
+
+| Enum | Русский | validUntil |
+|---|---|---|
+| `PRESCRIPTION` | Рецепт | обычно 30 дней |
+| `REFERRAL` | Направление | обычно несколько дней |
+| `SICK_LEAVE` | Больничный лист | явная дата |
+| `ANALYSIS_ORDER` | Направление на анализы | несколько дней |
+| `CERTIFICATE` | Справка | null (бессрочная) |
+
+### Типы заметок (PatientNoteType)
+
+| Enum | Русский | visibleToClient по умолчанию |
+|---|---|---|
+| `DIAGNOSIS` | Диагноз | false |
+| `OBSERVATION` | Наблюдение | false |
+| `NOTE` | Заметка | false |
 
 ---
 
@@ -247,7 +425,8 @@ mvn test -Dtest="AuthIntegrationTest,PatientIntegrationTest"                    
 ```logql
 {app="pet-hospital"}                          # все логи
 {app="pet-hospital"} |= "ERROR"               # только ошибки
-{app="pet-hospital"} |= "ClientServiceImpl"   # клиентский портал
+{app="pet-hospital"} |= "ChatServiceImpl"     # логи чата
+{app="pet-hospital"} |= "MedicalServiceImpl"  # логи медицины
 {app="pet-hospital", level=~"WARN|ERROR"}     # warning и выше
 ```
 

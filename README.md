@@ -35,6 +35,8 @@
 26. [Ролевой интерфейс — фронтенд](#26-ролевой-интерфейс--фронтенд)
 27. [Мониторинг: Loki + Grafana](#27-мониторинг-loki--grafana)
 28. [Клиентский портал](#28-клиентский-портал)
+29. [Чат-система](#29-чат-система)
+30. [Медицинская документация](#30-медицинская-документация)
 
 ---
 
@@ -202,9 +204,18 @@ src/main/java/com/hospital/
 |   +-- WardController.java             # /api/wards
 |   +-- PaidServiceController.java      # /api/paid-services
 |   +-- AdminController.java            # /api/admin
+|   +-- ClientController.java           # /api/client/** (клиентский портал)
+|   +-- ChatController.java             # /api/chat/** (чат-система)
+|   +-- MedicalController.java          # /api/medical/** (мед. документация)
 |
 +-- service/                            # Интерфейсы сервисного слоя
+|   +-- ClientService.java              # Клиентский портал
+|   +-- ChatService.java                # Чат-система
+|   +-- MedicalService.java             # Медицинская документация
 |   +-- impl/                           # Реализации сервисов
+|   |   +-- ClientServiceImpl.java
+|   |   +-- ChatServiceImpl.java        # getOrCreate-комнаты, IDOR-защита
+|   |   +-- MedicalServiceImpl.java     # документы, заметки, history
 |   +-- event/                          # Kafka-события и консьюмеры
 |   |   +-- EventPublisher.java
 |   |   +-- PatientEvent.java
@@ -235,7 +246,14 @@ src/main/java/com/hospital/
 |   +-- WardOccupationHistory.java      # Аудит смены палаты
 |   +-- OutboxEvent.java                # Идемпотентность Kafka
 |   +-- User.java                       # Пользователи системы
+|   +-- Appointment.java                # Запись к врачу (клиентский портал)
+|   +-- ClientServiceOrder.java         # Заказ услуги (клиентский портал)
+|   +-- ChatRoom.java                   # Комната чата (SUPPORT / DOCTOR_CLIENT)
+|   +-- ChatMessage.java                # Сообщение чата (short-polling)
+|   +-- MedicalDocument.java            # Медицинский документ (soft-delete)
+|   +-- PatientNote.java                # Заметка врача (visibleToClient flag)
 |   +-- Gender.java, Specialty.java, PatientStatus.java, Role.java  # Enums
+|   +-- ChatRoomType.java, DocumentType.java, NoteType.java          # Enums чата/мед
 |
 +-- repository/                         # Spring Data JPA репозитории
 +-- dto/
@@ -432,6 +450,68 @@ public class ClientServiceOrder {
 }
 ```
 
+### ChatRoom — комната чата
+
+```java
+@Entity @Table(name = "chat_room")
+public class ChatRoom {
+    Long id;
+    ChatRoomType type;    // SUPPORT (тех.поддержка) / DOCTOR_CLIENT (врач-клиент)
+    User clientUser;      // @ManyToOne — клиент-инициатор
+    User staffUser;       // @ManyToOne nullable — конкретный врач (null для SUPPORT)
+    LocalDateTime createdAt;
+}
+```
+
+Частичный уникальный индекс (`WHERE type='SUPPORT'`) гарантирует максимум одну SUPPORT-комнату на клиента — паттерн **get-or-create** без дублей.
+
+### ChatMessage — сообщение чата
+
+```java
+@Entity @Table(name = "chat_message")
+public class ChatMessage {
+    Long id;
+    ChatRoom room;       // @ManyToOne — принадлежность к комнате
+    User sender;         // @ManyToOne — автор сообщения
+    String content;      // @NotBlank
+    LocalDateTime sentAt;
+}
+```
+
+Сообщения читаются через **short-polling**: `GET /api/chat/rooms/{id}/messages/poll?sinceId={lastId}` — возвращает только сообщения с `id > sinceId`. Клиент опрашивает каждые 3 секунды.
+
+### MedicalDocument — медицинский документ
+
+```java
+@Entity @Table(name = "medical_document")
+public class MedicalDocument {
+    Long id;
+    Patient patient;        // @ManyToOne
+    Doctor issuedBy;        // @ManyToOne — врач, выдавший документ
+    DocumentType type;      // DIAGNOSIS, PRESCRIPTION, SICK_LEAVE, REFERRAL, ANALYSIS_RESULT, OTHER
+    String title;           // @NotBlank
+    String content;         // полный текст
+    LocalDate issuedAt;
+    LocalDate validUntil;   // nullable — срок действия
+    boolean active;         // soft-delete: false = документ архивирован
+}
+```
+
+### PatientNote — заметка врача
+
+```java
+@Entity @Table(name = "patient_note")
+public class PatientNote {
+    Long id;
+    Patient patient;         // @ManyToOne
+    Doctor doctor;           // @ManyToOne — автор заметки
+    NoteType type;           // OBSERVATION, COMPLAINT, TREATMENT_PLAN, FOLLOW_UP, OTHER
+    String content;          // @NotBlank
+    boolean visibleToClient; // @Builder.Default false — по умолчанию скрыта от пациента
+    LocalDateTime createdAt;
+}
+```
+
 ### Перечисления (Enums)
 
 ```java
@@ -443,6 +523,10 @@ enum Specialty               { CARDIOLOGIST, SURGEON, THERAPIST, NEUROLOGIST,
 enum DischargeType            { NORMAL, FORCED, TRANSFER }
 enum AppointmentStatus        { PENDING, CONFIRMED, CANCELLED }
 enum ClientServiceOrderStatus { PENDING, CONFIRMED, COMPLETED, CANCELLED }
+enum ChatRoomType             { SUPPORT, DOCTOR_CLIENT }
+enum DocumentType             { DIAGNOSIS, PRESCRIPTION, SICK_LEAVE, REFERRAL,
+                               ANALYSIS_RESULT, OTHER }
+enum NoteType                 { OBSERVATION, COMPLAINT, TREATMENT_PLAN, FOLLOW_UP, OTHER }
 ```
 
 ---
@@ -541,6 +625,55 @@ CREATE TABLE client_service_order (
 | Новые палаты | 32 (итого ~36) |
 | Новые пациенты | 40 (итого ~45) |
 | Новые платные услуги | 20 (итого ~22) |
+
+#### V6__chat_medical_schema.sql
+
+Создаёт таблицы чат-системы и медицинской документации:
+
+```sql
+CREATE TABLE chat_room (
+    id             BIGSERIAL    PRIMARY KEY,
+    type           VARCHAR(20)  NOT NULL,  -- SUPPORT / DOCTOR_CLIENT
+    client_user_id BIGINT       NOT NULL REFERENCES users(id),
+    staff_user_id  BIGINT                 REFERENCES users(id),  -- nullable
+    created_at     TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+-- Частичный уникальный индекс: один SUPPORT-чат на клиента
+CREATE UNIQUE INDEX uq_support_room
+    ON chat_room (client_user_id)
+    WHERE type = 'SUPPORT';
+
+CREATE TABLE chat_message (
+    id      BIGSERIAL    PRIMARY KEY,
+    room_id BIGINT       NOT NULL REFERENCES chat_room(id),
+    sender_id BIGINT     NOT NULL REFERENCES users(id),
+    content TEXT         NOT NULL,
+    sent_at TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE medical_document (
+    id           BIGSERIAL    PRIMARY KEY,
+    patient_id   BIGINT       NOT NULL REFERENCES patient(id),
+    issued_by_id BIGINT       NOT NULL REFERENCES doctor(id),
+    type         VARCHAR(30)  NOT NULL,
+    title        VARCHAR(255) NOT NULL,
+    content      TEXT,
+    issued_at    DATE         NOT NULL,
+    valid_until  DATE,        -- nullable
+    active       BOOLEAN      NOT NULL DEFAULT TRUE  -- soft-delete
+);
+
+CREATE TABLE patient_note (
+    id               BIGSERIAL    PRIMARY KEY,
+    patient_id       BIGINT       NOT NULL REFERENCES patient(id),
+    doctor_id        BIGINT       NOT NULL REFERENCES doctor(id),
+    type             VARCHAR(30)  NOT NULL,
+    content          TEXT         NOT NULL,
+    visible_to_client BOOLEAN     NOT NULL DEFAULT FALSE,
+    created_at       TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+```
 
 ---
 
@@ -825,6 +958,31 @@ public void dischargePatient(Long patientId, DischargeType type) {
 | GET | `/api/client/appointments/my` | `ROLE_CLIENT` | Мои записи на приём |
 | POST | `/api/client/service-orders` | `ROLE_CLIENT` | Заказать платную услугу |
 | GET | `/api/client/service-orders/my` | `ROLE_CLIENT` | Мои заказы услуг |
+
+### Чат `/api/chat`
+
+| Метод | URL | Доступ | Описание |
+|---|---|---|---|
+| POST | `/api/chat/support` | `ROLE_CLIENT` | Создать / получить SUPPORT-комнату |
+| GET | `/api/chat/support` | `ROLE_ADMIN` | Все SUPPORT-комнаты |
+| GET | `/api/chat/my-rooms` | `ROLE_CLIENT` | Мои чат-комнаты |
+| GET | `/api/chat/doctor/rooms` | `ROLE_DOCTOR` | Чаты этого врача |
+| POST | `/api/chat/rooms/{id}/messages` | Любой auth. | Отправить сообщение |
+| GET | `/api/chat/rooms/{id}/messages` | Любой auth. | История сообщений |
+| GET | `/api/chat/rooms/{id}/messages/poll?sinceId={n}` | Любой auth. | Polling: сообщения > n |
+
+### Медицинская документация `/api/medical`
+
+| Метод | URL | Доступ | Описание |
+|---|---|---|---|
+| POST | `/api/medical/documents` | `ROLE_DOCTOR` | Создать документ |
+| GET | `/api/medical/documents/patient/{id}` | `ROLE_DOCTOR`, `ROLE_ADMIN` | Документы пациента |
+| GET | `/api/medical/documents/my` | `ROLE_CLIENT` | Мои документы |
+| DELETE | `/api/medical/documents/{id}` | `ROLE_DOCTOR`, `ROLE_ADMIN` | Архивировать |
+| POST | `/api/medical/notes` | `ROLE_DOCTOR` | Создать заметку |
+| GET | `/api/medical/notes/patient/{id}` | `ROLE_DOCTOR`, `ROLE_ADMIN` | Заметки пациента |
+| GET | `/api/medical/history/patient/{id}` | `ROLE_DOCTOR`, `ROLE_ADMIN` | История пациента |
+| GET | `/api/medical/history/my` | `ROLE_CLIENT` | Моя история |
 
 ### Формат страничного ответа `PageResponse<T>`
 
@@ -1584,17 +1742,34 @@ src/test/java/com/hospital/
 |   +-- TestTransactionConfig.java        # @TestConfiguration: явный JpaTransactionManager
 |   +-- AuthIntegrationTest.java          # 12 тестов: вход, регистрация, авторизация
 |   +-- PatientIntegrationTest.java       # 8 тестов: CRUD пациентов, поиск
+|   +-- ChatIntegrationTest.java          # 13 тестов: чат-система, RBAC, polling
+|   +-- MedicalIntegrationTest.java       # 23 теста: документы, заметки, история
 |
 +-- service/
 |   +-- PatientServiceTest.java           # 10 юнит-тестов PatientService
 |   +-- WardServiceTest.java              # 5 юнит-тестов WardService
 |   +-- AdminServiceTest.java             # 9 юнит-тестов AdminService
+|   +-- ChatServiceTest.java              # 25 юнит-тестов ChatService
+|   +-- MedicalServiceTest.java           # 21 юнит-тест MedicalService
 |
 +-- config/
     +-- JwtUtilTest.java                  # 5 тестов генерации и валидации JWT
 ```
 
-**Итого: 49 тестов — все проходят.**
+**Итого: 193 теста — все проходят.**
+
+| Класс | Тип | Тестов | Что проверяет |
+|---|---|---|---|
+| `PatientServiceTest` | Unit | 10 | Создание, soft-delete, поиск, назначение врача |
+| `WardServiceTest` | Unit | 5 | Поступление, выписка, заполненность палат |
+| `AdminServiceTest` | Unit | 9 | Финансовые отчёты, Redis кэш |
+| `ChatServiceTest` | Unit | 25 | getOrCreate (идемпотентность), IDOR, polling |
+| `MedicalServiceTest` | Unit | 21 | Документы, заметки, патиент-история |
+| `JwtUtilTest` | Unit | 5 | Генерация/валидация/истечение JWT |
+| `AuthIntegrationTest` | Integration | 12 | Login, register, RBAC 401/403 |
+| `PatientIntegrationTest` | Integration | 8 | CRUD пациентов HTTP end-to-end |
+| `ChatIntegrationTest` | Integration | 13 | Комнаты, сообщения, polling end-to-end |
+| `MedicalIntegrationTest` | Integration | 23 | Документы и заметки HTTP end-to-end |
 
 ### Юнит-тесты (Mockito)
 
@@ -2362,4 +2537,209 @@ users (ROLE_CLIENT)
     +-- (1:N) client_service_order -- paid_service
                   ↓ status
              PENDING / CONFIRMED / COMPLETED / CANCELLED
+```
+
+---
+
+## 29. Чат-система
+
+### Назначение
+
+Встроенная система обмена сообщениями между клиентами и персоналом больницы. Реализована на **short-polling** (без WebSocket) для простоты и совместимости с обычным REST API.
+
+### Типы комнат
+
+| Тип | Инициатор | Получатель | Описание |
+|---|---|---|---|
+| `SUPPORT` | `ROLE_CLIENT` | Любой `ROLE_ADMIN` | Техническая поддержка клиента. Одна комната на клиента |
+| `DOCTOR_CLIENT` | `ROLE_DOCTOR` / `ROLE_CLIENT` | Конкретный врач | Переписка с врачом по лечению |
+
+### REST API чата
+
+| Метод | URL | Роль | Описание |
+|---|---|---|---|
+| `POST` | `/api/chat/support` | `ROLE_CLIENT` | Создать или получить SUPPORT-комнату |
+| `GET` | `/api/chat/support` | `ROLE_ADMIN` | Список всех SUPPORT-комнат |
+| `GET` | `/api/chat/my-rooms` | `ROLE_CLIENT` | Все комнаты текущего клиента |
+| `GET` | `/api/chat/doctor/rooms` | `ROLE_DOCTOR` | Все комнаты, где врач — участник |
+| `POST` | `/api/chat/rooms/{roomId}/messages` | Любой auth. | Отправить сообщение |
+| `GET` | `/api/chat/rooms/{roomId}/messages` | Любой auth. | История сообщений комнаты |
+| `GET` | `/api/chat/rooms/{roomId}/messages/poll?sinceId={n}` | Любой auth. | Polling: новые сообщения с id > n |
+
+### Short-polling
+
+Клиент периодически запрашивает новые сообщения, передавая `sinceId` — id последнего полученного сообщения:
+
+```
+Client                               Server
+  |                                     |
+  |-- GET /poll?sinceId=0 ------------> |
+  |<-- [] (пусто) --------------------- |   (первый запрос, нет сообщений)
+  |                                     |
+  |-- GET /poll?sinceId=0 ------------> |
+  |<-- [{id:1, content:"Привет"}] ----- |   (новое сообщение появилось)
+  |                                     |
+  |-- GET /poll?sinceId=1 ------------> |
+  |<-- [] ----------------------------- |   (ждём следующее)
+```
+
+Клиент обновляет `sinceId` при каждом непустом ответе. Интервал опроса — 3 секунды.
+
+### IDOR-защита
+
+Доступ к комнате ограничен по роли: каждый пользователь видит только свои комнаты. Реализовано в `ChatServiceImpl.getAccessibleRoom()`:
+
+```java
+private ChatRoom getAccessibleRoom(Long roomId, User user) {
+    ChatRoom room = chatRoomRepository.findById(roomId)
+        .orElseThrow(() -> new ResourceNotFoundException("Комната не найдена"));
+
+    boolean hasAccess = switch (user.getRole()) {
+        case ROLE_CLIENT -> room.getClientUser().getId().equals(user.getId());
+        case ROLE_DOCTOR -> room.getStaffUser() != null &&
+                            room.getStaffUser().getId().equals(user.getId());
+        case ROLE_ADMIN  -> true;
+        default          -> false;
+    };
+
+    if (!hasAccess) throw new AccessDeniedException("Нет доступа к комнате");
+    return room;
+}
+```
+
+### Идемпотентность getOrCreate
+
+`POST /api/chat/support` работает как **get-or-create**: повторный вызов возвращает ту же комнату, не создаёт дубль. Реализовано через `orElseGet()` — важное отличие от `orElse()`:
+
+```java
+// ПРАВИЛЬНО: save() вызывается ТОЛЬКО если комната не найдена
+return chatRoomRepository.findSupportRoomByClientUser(clientUser)
+    .orElseGet(() -> chatRoomRepository.save(
+        ChatRoom.builder()
+            .type(ChatRoomType.SUPPORT)
+            .clientUser(clientUser)
+            .build()
+    ));
+
+// НЕПРАВИЛЬНО: orElse() вычисляет аргумент безусловно → save() всегда вызывается
+// .orElse(chatRoomRepository.save(...));  ← НЕ ИСПОЛЬЗОВАТЬ
+```
+
+На уровне БД защита дублей — частичный уникальный индекс `uq_support_room` (V6-миграция).
+
+### Модель данных чата
+
+```
+users (ROLE_CLIENT) ──── (1:N) ──── chat_room ──── (1:N) ──── chat_message
+                                        │
+users (ROLE_ADMIN/DOCTOR) ──────────── │ (staff_user_id, nullable)
+```
+
+---
+
+## 30. Медицинская документация
+
+### Назначение
+
+Модуль для ведения медицинской документации пациентов: официальные документы (диагнозы, рецепты, больничные) и заметки врача (наблюдения, жалобы, план лечения). Поддерживает soft-delete для документов и опциональную видимость заметок для клиентов.
+
+### Типы документов (DocumentType)
+
+| Тип | Описание |
+|---|---|
+| `DIAGNOSIS` | Диагноз |
+| `PRESCRIPTION` | Рецепт |
+| `SICK_LEAVE` | Больничный лист |
+| `REFERRAL` | Направление |
+| `ANALYSIS_RESULT` | Результаты анализов |
+| `OTHER` | Прочее |
+
+### Типы заметок (NoteType)
+
+| Тип | Описание |
+|---|---|
+| `OBSERVATION` | Наблюдение |
+| `COMPLAINT` | Жалоба |
+| `TREATMENT_PLAN` | План лечения |
+| `FOLLOW_UP` | Контрольный осмотр |
+| `OTHER` | Прочее |
+
+### REST API медицинской документации
+
+| Метод | URL | Роль | Описание |
+|---|---|---|---|
+| `POST` | `/api/medical/documents` | `ROLE_DOCTOR` | Создать документ |
+| `GET` | `/api/medical/documents/patient/{id}` | `ROLE_DOCTOR` / `ROLE_ADMIN` | Документы пациента |
+| `GET` | `/api/medical/documents/my` | `ROLE_CLIENT` | Мои документы (только `visibleToClient`) |
+| `DELETE` | `/api/medical/documents/{id}` | `ROLE_DOCTOR` / `ROLE_ADMIN` | Архивировать (soft-delete) |
+| `POST` | `/api/medical/notes` | `ROLE_DOCTOR` | Создать заметку |
+| `GET` | `/api/medical/notes/patient/{id}` | `ROLE_DOCTOR` / `ROLE_ADMIN` | Заметки пациента |
+| `GET` | `/api/medical/history/patient/{id}` | `ROLE_DOCTOR` / `ROLE_ADMIN` | Агрегированная история |
+| `GET` | `/api/medical/history/my` | `ROLE_CLIENT` | Моя история (только видимые) |
+
+### Создание документа — пример запроса
+
+```json
+POST /api/medical/documents
+{
+  "patientId": 1,
+  "type": "PRESCRIPTION",
+  "title": "Рецепт на амоксициллин",
+  "content": "Амоксициллин 500мг 3 раза в день, 7 дней",
+  "issuedAt": "2026-05-19",
+  "validUntil": "2026-06-19"
+}
+```
+
+Врач определяется автоматически из JWT-токена (по полю `username` → `doctorRepository.findByUser`).
+
+### Флаг visibleToClient
+
+По умолчанию заметки скрыты от пациента — **безопасное умолчание** (`@Builder.Default private boolean visibleToClient = false`). Врач явно устанавливает `"visibleToClient": true`, чтобы клиент увидел заметку в своём личном кабинете:
+
+```json
+POST /api/medical/notes
+{
+  "patientId": 1,
+  "type": "OBSERVATION",
+  "content": "Пациент идёт на поправку",
+  "visibleToClient": true
+}
+```
+
+### Агрегированная история пациента
+
+`GET /api/medical/history/patient/{id}` возвращает объединённую хронологию из документов и заметок:
+
+```json
+{
+  "patientId": 1,
+  "patientName": "Иванов Иван Иванович",
+  "documents": [...],
+  "notes": [...]
+}
+```
+
+Для `GET /api/medical/history/my` (ROLE_CLIENT) документы фильтруются по `active=true`, заметки — по `visibleToClient=true`.
+
+### Soft-delete документов
+
+Документ не удаляется физически. `DELETE /api/medical/documents/{id}` устанавливает `active = false`. Запросы `GET` автоматически фильтруют по `active = true`. Архивированные документы остаются в БД для аудиторской цепочки.
+
+### Безопасность
+
+- `ROLE_DOCTOR` — создаёт документы/заметки, читает документацию своих пациентов
+- `ROLE_ADMIN` — полный доступ на чтение
+- `ROLE_CLIENT` — только свои документы и видимые заметки (`active=true`, `visibleToClient=true`)
+- `ROLE_NURSE` — нет доступа к `/api/medical/**`
+
+### Модель данных
+
+```
+patient ──── (1:N) ──── medical_document ←── doctor (issuedBy)
+    │                        ↓ active=false (soft-delete)
+    │
+    └─── (1:N) ──── patient_note ←── doctor
+                        ↓ visibleToClient
+                   false (default) / true
 ```
