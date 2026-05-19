@@ -1421,37 +1421,63 @@ Actuator предоставляет эндпоинты для мониторин
 
 ```dockerfile
 # --- Этап 1: Сборка ---
-FROM maven:3.9-eclipse-temurin-17 AS build
+FROM maven:3.9-eclipse-temurin-17-alpine AS build
 WORKDIR /app
 COPY pom.xml .
-RUN mvn dependency:go-offline          # скачиваем зависимости отдельно (кэш слоя)
+RUN mvn dependency:go-offline -q       # скачиваем зависимости отдельно (кэш слоя)
 COPY src ./src
-RUN mvn package -DskipTests
+RUN mvn package -DskipTests -q
 
 # --- Этап 2: Runtime ---
 FROM eclipse-temurin:17-jre-alpine     # минимальный образ ~180MB
-RUN adduser -D hospital                # непривилегированный пользователь
+RUN addgroup -S hospital && adduser -S hospital -G hospital
 USER hospital
-COPY --from=build /app/target/*.jar app.jar
+COPY --from=build /app/target/pet-hospital-*.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
 ```
 
 **Многоэтапная сборка** позволяет получить маленький финальный образ. Maven и исходники в него не попадают — только скомпилированный JAR. Слой `dependency:go-offline` кэшируется Docker и не перекачивается при изменении только исходников.
 
+`-XX:+UseContainerSupport` — JVM автоматически определяет лимиты CPU и памяти из cgroup контейнера.
+
 ### docker-compose.yml
 
-Описывает 7 сервисов инфраструктуры (само приложение запускается локально через Maven/IDE):
+Описывает **8 сервисов** — всю инфраструктуру и само приложение:
 
 | Сервис | Образ | Порт | Назначение |
 |---|---|---|---|
+| **app** | (сборка из Dockerfile) | 8080 | Spring Boot приложение |
 | postgres | postgres:15-alpine | 5432 | Основная БД |
 | zookeeper | confluentinc/cp-zookeeper:7.6.0 | 2181 | Координация Kafka |
-| kafka | confluentinc/cp-kafka:7.6.0 | 9092 | Брокер сообщений |
+| kafka | confluentinc/cp-kafka:7.6.0 | 9092 | Брокер сообщений (хост) |
 | redis | redis:7-alpine | 6379 | Кэш |
 | kafdrop | obsidiandynamics/kafdrop | 9000 | Web UI для Kafka |
 | **loki** | grafana/loki:2.9.0 | 3100 | Хранилище логов |
 | **grafana** | grafana/grafana:10.2.3 | 3000 | Визуализация логов |
+
+### Kafka — двойные листенеры
+
+Kafka настроена с двумя независимыми листенерами, чтобы работать одновременно для контейнеров и для хоста:
+
+```
+PLAINTEXT://kafka:29092      — для сервисов внутри Docker-сети (app, kafdrop)
+PLAINTEXT_HOST://localhost:9092 — для подключения с хоста (Postman, тесты вне Docker)
+```
+
+Приложение `app` в docker-compose получает `SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092`.
+При локальном запуске через Maven используется дефолт `localhost:9092` из `application.yml`.
+
+### Переменные окружения сервиса app
+
+Все `localhost`-адреса из `application.yml` переопределяются через env-переменные:
+
+| Переменная | Значение в Docker | Дефолт (application.yml) |
+|---|---|---|
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://postgres:5432/hospital_db` | `localhost:5432` |
+| `SPRING_DATA_REDIS_HOST` | `redis` | `localhost` |
+| `SPRING_KAFKA_BOOTSTRAP_SERVERS` | `kafka:29092` | `localhost:9092` |
+| `LOKI_URL` | `http://loki:3100` | `http://localhost:3100` |
 
 **Kafdrop** — `http://localhost:9000`. Просмотр топиков, чтение сообщений, мониторинг групп консьюмеров.
 
@@ -1615,38 +1641,69 @@ Testcontainers требует Docker. На Windows с Docker Desktop нужна 
 
 | Инструмент | Версия | Зачем |
 |---|---|---|
-| Java | 17+ | Запуск приложения |
-| Maven | 3.9+ | Сборка проекта |
-| Docker Desktop | 4.x+ | Контейнеры инфраструктуры |
+| Docker Desktop | 4.x+ | Запуск всех сервисов |
+| Java | 17+ | Только для локальной разработки без Docker |
+| Maven | 3.9+ | Только для локальной разработки без Docker |
 
 > **Windows**: для Testcontainers включите TCP в Docker Desktop:
 > **Settings → General → Expose daemon on tcp://localhost:2375 without TLS**
 
 ---
 
-### Быстрый старт (2 команды)
+### Быстрый старт — полный запуск через Docker (1 команда)
 
 ```bash
-# 1. Поднять всю инфраструктуру
 docker-compose up -d
-
-# 2. Запустить приложение
-mvn spring-boot:run
 ```
 
+Команда собирает образ приложения из `Dockerfile` и запускает все 8 сервисов.
 После старта открыть: **http://localhost:8080** (войти: admin / admin123)
+
+Дождаться готовности (все статусы `running` или `healthy`):
+```bash
+docker-compose ps
+```
+
+Просмотр логов приложения в реальном времени:
+```bash
+docker-compose logs -f app
+```
 
 ---
 
-### Пошаговый запуск с объяснениями
+### Пересборка образа приложения
 
-#### Шаг 1 — Поднять инфраструктуру
+При изменении кода нужно пересобрать образ:
+
+```bash
+docker-compose up -d --build app
+```
+
+---
+
+### Альтернатива — локальная разработка (инфра в Docker, приложение в IDE)
+
+```bash
+# 1. Поднять только инфраструктуру (без приложения)
+docker-compose up -d postgres redis zookeeper kafka kafdrop loki grafana
+
+# 2. Запустить приложение локально
+mvn spring-boot:run
+```
+
+При локальном запуске `application.yml` использует `localhost` для всех сервисов — это дефолтные значения. Инфраструктура доступна через проброшенные порты.
+
+---
+
+### Пошаговый запуск с объяснениями (Docker)
+
+#### Шаг 1 — Запустить все сервисы
 
 ```bash
 docker-compose up -d
 ```
 
-Запускает 7 контейнеров. Проверить готовность:
+Запускает 8 контейнеров. Проверить готовность:
 
 ```bash
 docker-compose ps
@@ -1656,28 +1713,23 @@ docker-compose ps
 
 | Контейнер | Порт | Что там |
 |---|---|---|
+| **hospital-app** | http://localhost:8080 | Spring Boot приложение |
 | hospital-postgres | 5432 | PostgreSQL — основная БД |
 | hospital-redis | 6379 | Redis — кэш |
 | hospital-zookeeper | 2181 | Zookeeper (для Kafka) |
-| hospital-kafka | 9092 | Apache Kafka |
+| hospital-kafka | 9092 | Apache Kafka (внешний доступ с хоста) |
 | hospital-kafdrop | http://localhost:9000 | UI просмотра Kafka-топиков |
 | **hospital-loki** | 3100 | Хранилище логов |
 | **hospital-grafana** | http://localhost:3000 | Дашборды логов |
 
-#### Шаг 2 — Запустить приложение
+> Сервис `app` зависит от `postgres`, `redis`, `kafka`, `loki` — Docker Compose дождётся их готовности (`service_healthy`) перед запуском приложения. Первый запуск занимает ~90 секунд (сборка JAR внутри контейнера).
 
-```bash
-mvn spring-boot:run
-```
-
-Или через IDE — запустить `HospitalApplication.java`.
-
-При старте происходит автоматически:
+При старте приложения происходит автоматически:
 - Flyway применяет миграции V1 → V2 → V3
 - `DataInitializer` создаёт пользователя `admin / admin123`
-- `loki4j` начинает отправлять логи в Loki на `localhost:3100`
+- `loki4j` начинает отправлять логи в Loki на `http://loki:3100`
 
-#### Шаг 3 — Открыть интерфейсы
+#### Шаг 2 — Открыть интерфейсы
 
 | Интерфейс | URL | Учётные данные |
 |---|---|---|
@@ -1693,7 +1745,10 @@ mvn spring-boot:run
 ### Запуск только части сервисов
 
 ```bash
-# Только БД + кэш (минимум для разработки без Kafka)
+# Только инфраструктура без приложения (для разработки в IDE)
+docker-compose up -d postgres redis zookeeper kafka kafdrop loki grafana
+
+# Только БД + кэш (минимум без Kafka и мониторинга)
 docker-compose up -d postgres redis
 
 # С Kafka (для тестирования событий)
@@ -1795,7 +1850,23 @@ mvn test -Dtest="AuthIntegrationTest,PatientIntegrationTest"
 
 ## 24. Конфигурация
 
-### application.yml (production)
+### Переменные окружения (Docker)
+
+При запуске через `docker-compose up -d` сервис `app` получает следующие переменные, которые Spring Boot автоматически подставляет вместо значений `application.yml`:
+
+| Переменная | Значение | Переопределяет |
+|---|---|---|
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://postgres:5432/hospital_db` | `localhost:5432` |
+| `SPRING_DATASOURCE_USERNAME` | `postgres` | — |
+| `SPRING_DATASOURCE_PASSWORD` | `1234` | — |
+| `SPRING_DATA_REDIS_HOST` | `redis` | `localhost` |
+| `SPRING_DATA_REDIS_PORT` | `6379` | — |
+| `SPRING_KAFKA_BOOTSTRAP_SERVERS` | `kafka:29092` | `localhost:9092` |
+| `LOKI_URL` | `http://loki:3100` | `http://localhost:3100` |
+
+Spring Boot поддерживает переопределение любого свойства через env-переменные в формате `SPRING_PROPERTY_NAME` (точки заменяются на `_`, всё uppercase).
+
+### application.yml (локальная разработка)
 
 ```yaml
 spring:

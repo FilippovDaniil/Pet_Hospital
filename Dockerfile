@@ -11,4 +11,4 @@ RUN addgroup -S hospital && adduser -S hospital -G hospital
 COPY --from=build /app/target/pet-hospital-*.jar app.jar
 USER hospital
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
