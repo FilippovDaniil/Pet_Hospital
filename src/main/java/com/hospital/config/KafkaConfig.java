@@ -1,10 +1,12 @@
 package com.hospital.config;
 
+import jakarta.persistence.EntityManagerFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.ConsumerFactory;
@@ -13,6 +15,8 @@ import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.transaction.KafkaTransactionManager;
+import org.springframework.orm.jpa.JpaTransactionManager;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.util.backoff.FixedBackOff;
 
 /**
@@ -147,10 +151,21 @@ public class KafkaConfig {
                 exception.getMessage());
     }
 
-    // ---- Kafka Transaction Manager ----
-    // Используется если нужны транзакционные Kafka-сообщения (ровно один раз, exactly-once семантика).
-    // В нашем проекте транзакции БД через JPA + Outbox обеспечивают согласованность,
-    // но KafkaTransactionManager может понадобиться для полной exactly-once гарантии.
+    // ---- Transaction Managers ----
+    //
+    // Проблема: когда transaction-id-prefix задан в application.yml, Spring Kafka регистрирует
+    // KafkaTransactionManager как PlatformTransactionManager. Spring Boot видит, что бин уже есть,
+    // и НЕ создаёт JpaTransactionManager автоматически. JPA-репозитории падают с ошибкой
+    // "No bean named 'transactionManager' available".
+    //
+    // Решение: явно объявить JpaTransactionManager с @Primary, чтобы Spring Data JPA
+    // использовал его, а не KafkaTransactionManager, для операций с базой данных.
+
+    @Bean
+    @Primary
+    public PlatformTransactionManager transactionManager(EntityManagerFactory entityManagerFactory) {
+        return new JpaTransactionManager(entityManagerFactory);
+    }
 
     @Bean
     public KafkaTransactionManager<String, Object> kafkaTransactionManager(

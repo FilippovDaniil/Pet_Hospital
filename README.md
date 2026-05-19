@@ -1375,7 +1375,7 @@ public class GlobalExceptionHandler {
 
 ## 19. Swagger / OpenAPI
 
-После запуска приложения документация доступна по адресу: `http://localhost:8080/swagger-ui.html`
+После запуска приложения документация доступна по адресу: `http://localhost:8090/swagger-ui.html`
 
 Все контроллеры аннотированы:
 ```java
@@ -1433,7 +1433,7 @@ FROM eclipse-temurin:17-jre-alpine     # минимальный образ ~180M
 RUN addgroup -S hospital && adduser -S hospital -G hospital
 USER hospital
 COPY --from=build /app/target/pet-hospital-*.jar app.jar
-EXPOSE 8080
+EXPOSE 8090
 ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
 ```
 
@@ -1447,7 +1447,7 @@ ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-Djava.security.egd=file:/dev/.
 
 | Сервис | Образ | Порт | Назначение |
 |---|---|---|---|
-| **app** | (сборка из Dockerfile) | 8080 | Spring Boot приложение |
+| **app** | (сборка из Dockerfile) | 8090 | Spring Boot приложение |
 | postgres | postgres:15-alpine | 5432 | Основная БД |
 | zookeeper | confluentinc/cp-zookeeper:7.6.0 | 2181 | Координация Kafka |
 | kafka | confluentinc/cp-kafka:7.6.0 | 9092 | Брокер сообщений (хост) |
@@ -1657,7 +1657,7 @@ docker-compose up -d
 ```
 
 Команда собирает образ приложения из `Dockerfile` и запускает все 8 сервисов.
-После старта открыть: **http://localhost:8080** (войти: admin / admin123)
+После старта открыть: **http://localhost:8090** (войти: admin / admin123)
 
 Дождаться готовности (все статусы `running` или `healthy`):
 ```bash
@@ -1713,7 +1713,7 @@ docker-compose ps
 
 | Контейнер | Порт | Что там |
 |---|---|---|
-| **hospital-app** | http://localhost:8080 | Spring Boot приложение |
+| **hospital-app** | http://localhost:8090 | Spring Boot приложение |
 | hospital-postgres | 5432 | PostgreSQL — основная БД |
 | hospital-redis | 6379 | Redis — кэш |
 | hospital-zookeeper | 2181 | Zookeeper (для Kafka) |
@@ -1733,10 +1733,10 @@ docker-compose ps
 
 | Интерфейс | URL | Учётные данные |
 |---|---|---|
-| **Web-интерфейс (HIS)** | http://localhost:8080 | admin / admin123 |
-| Swagger UI | http://localhost:8080/swagger-ui.html | — |
-| API Docs | http://localhost:8080/api-docs | — |
-| Actuator Health | http://localhost:8080/actuator/health | — |
+| **Web-интерфейс (HIS)** | http://localhost:8090 | admin / admin123 |
+| Swagger UI | http://localhost:8090/swagger-ui.html | — |
+| API Docs | http://localhost:8090/api-docs | — |
+| Actuator Health | http://localhost:8090/actuator/health | — |
 | Kafdrop (Kafka UI) | http://localhost:9000 | — |
 | **Grafana** | http://localhost:3000 | admin / admin |
 
@@ -1814,20 +1814,20 @@ docker-compose down -v
 Роль:    ROLE_ADMIN
 ```
 
-Для создания врача или медсестры — зарегистрироваться через http://localhost:8080/register.html.
+Для создания врача или медсестры — зарегистрироваться через http://localhost:8090/register.html.
 По умолчанию все новые пользователи получают роль `ROLE_NURSE`.
 Сменить роль можно только напрямую в БД или через SQL-запрос.
 
 **Получить JWT-токен через curl:**
 ```bash
-curl -X POST http://localhost:8080/api/auth/login \
+curl -X POST http://localhost:8090/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin123"}'
 ```
 
 **Использовать токен:**
 ```bash
-curl http://localhost:8080/api/patients \
+curl http://localhost:8090/api/patients \
   -H "Authorization: Bearer <token>"
 ```
 
