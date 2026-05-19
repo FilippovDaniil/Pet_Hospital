@@ -43,7 +43,6 @@ public class ClientServiceImpl implements ClientService {
     @Override
     public List<DepartmentResponse> getPublicDepartments() {
         return departmentRepository.findAll().stream()
-                .filter(Department::isActive)
                 .map(dep -> DepartmentResponse.builder()
                         .id(dep.getId())
                         .name(dep.getName())

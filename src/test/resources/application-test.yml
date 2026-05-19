@@ -1,4 +1,7 @@
 spring:
+  main:
+    allow-bean-definition-overriding: true
+
   datasource:
     url: jdbc:tc:postgresql:15:///hospital_test_db
     driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
