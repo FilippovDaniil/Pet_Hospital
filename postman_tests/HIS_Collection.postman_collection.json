@@ -2,19 +2,179 @@
   "info": {
     "name": "Pet Hospital HIS API",
     "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "description": "Complete API collection for Hospital Information System (HIS).\nBase URL variable: {{baseUrl}} = http://localhost:8080",
+    "description": "Complete API collection for Pet Hospital HIS.\nBase URL: {{baseUrl}} = http://localhost:8090\n\nПорядок запуска:\n1. Auth → Login as admin     (сохраняет adminToken)\n2. Auth → Login as doctor1   (сохраняет doctorToken)\n3. Auth → Login as client1   (сохраняет clientToken)\n4. Остальные папки — используют сохранённые токены автоматически\n\nПеременная doctorUserId: узнать через GET /api/doctors → linked user id врача doctor1.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl",   "value": "http://localhost:8080", "type": "string" },
-    { "key": "patientId", "value": "1",  "type": "string" },
-    { "key": "doctorId",  "value": "1",  "type": "string" },
-    { "key": "wardId",    "value": "1",  "type": "string" },
-    { "key": "serviceId", "value": "1",  "type": "string" },
-    { "key": "deptId",    "value": "1",  "type": "string" },
-    { "key": "linkId",    "value": "1",  "type": "string" }
+    { "key": "baseUrl",       "value": "http://localhost:8090", "type": "string" },
+    { "key": "adminToken",    "value": "",  "type": "string" },
+    { "key": "doctorToken",   "value": "",  "type": "string" },
+    { "key": "clientToken",   "value": "",  "type": "string" },
+    { "key": "patientId",     "value": "1", "type": "string" },
+    { "key": "doctorId",      "value": "1", "type": "string" },
+    { "key": "doctorUserId",  "value": "2", "type": "string" },
+    { "key": "wardId",        "value": "1", "type": "string" },
+    { "key": "serviceId",     "value": "1", "type": "string" },
+    { "key": "deptId",        "value": "1", "type": "string" },
+    { "key": "linkId",        "value": "1", "type": "string" },
+    { "key": "roomId",        "value": "1", "type": "string" },
+    { "key": "lastMessageId", "value": "0", "type": "string" },
+    { "key": "documentId",    "value": "1", "type": "string" },
+    { "key": "noteId",        "value": "1", "type": "string" }
   ],
   "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login as admin → save adminToken",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Has token', () => pm.expect(pm.response.json().token).to.be.a('string'));",
+                  "pm.test('Role is ADMIN', () => pm.expect(pm.response.json().role).to.eql('ROLE_ADMIN'));",
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('adminToken', pm.response.json().token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login as doctor1 → save doctorToken",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Role is DOCTOR', () => pm.expect(pm.response.json().role).to.eql('ROLE_DOCTOR'));",
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('doctorToken', pm.response.json().token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"doctor1\",\n  \"password\": \"doctor123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login as client1 → save clientToken",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Role is CLIENT', () => pm.expect(pm.response.json().role).to.eql('ROLE_CLIENT'));",
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('clientToken', pm.response.json().token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"client1\",\n  \"password\": \"client123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Register new staff (NURSE by default)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Role is NURSE', () => pm.expect(pm.response.json().role).to.eql('ROLE_NURSE'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"nurse_test\",\n  \"password\": \"nurse123\",\n  \"fullName\": \"Медсестра Тестовая Ивановна\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Register new client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Role is CLIENT', () => pm.expect(pm.response.json().role).to.eql('ROLE_CLIENT'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/register-client",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"newclient_test\",\n  \"password\": \"client123\",\n  \"fullName\": \"Новый Тестовый Клиент\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login with wrong password → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"wrongpassword\"\n}"
+            }
+          }
+        }
+      ]
+    },
     {
       "name": "Patients",
       "item": [
@@ -37,7 +197,10 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
             "url": "{{baseUrl}}/api/patients",
             "body": {
               "mode": "raw",
@@ -60,6 +223,7 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/patients/{{patientId}}"
           }
         },
@@ -83,6 +247,7 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": {
               "raw": "{{baseUrl}}/api/patients?page=0&size=10",
               "query": [
@@ -106,7 +271,10 @@
           ],
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
             "url": "{{baseUrl}}/api/patients/{{patientId}}",
             "body": {
               "mode": "raw",
@@ -129,6 +297,7 @@
           ],
           "request": {
             "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/patients/{{patientId}}/assign-doctor/{{doctorId}}"
           }
         },
@@ -147,6 +316,7 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/patients/{{patientId}}/services"
           }
         },
@@ -164,6 +334,7 @@
           ],
           "request": {
             "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/patients/{{patientId}}"
           }
         },
@@ -181,6 +352,7 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/patients/{{patientId}}"
           }
         }
@@ -206,7 +378,10 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
             "url": "{{baseUrl}}/api/doctors",
             "body": {
               "mode": "raw",
@@ -228,6 +403,7 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/doctors/{{doctorId}}"
           }
         },
@@ -246,6 +422,7 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": {
               "raw": "{{baseUrl}}/api/doctors?page=0&size=20",
               "query": [
@@ -272,6 +449,7 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": {
               "raw": "{{baseUrl}}/api/doctors?specialty=CARDIOLOGIST",
               "query": [{ "key": "specialty", "value": "CARDIOLOGIST" }]
@@ -292,7 +470,10 @@
           ],
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
             "url": "{{baseUrl}}/api/doctors/{{doctorId}}",
             "body": {
               "mode": "raw",
@@ -315,6 +496,7 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/doctors/{{doctorId}}/patients"
           }
         },
@@ -332,6 +514,7 @@
           ],
           "request": {
             "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/doctors/{{doctorId}}"
           }
         }
@@ -357,7 +540,10 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
             "url": "{{baseUrl}}/api/departments",
             "body": {
               "mode": "raw",
@@ -379,6 +565,7 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/departments/{{deptId}}"
           }
         },
@@ -397,6 +584,7 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/departments"
           }
         },
@@ -414,7 +602,10 @@
           ],
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
             "url": "{{baseUrl}}/api/departments/{{deptId}}",
             "body": {
               "mode": "raw",
@@ -436,6 +627,7 @@
           ],
           "request": {
             "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/departments/{{deptId}}"
           }
         }
@@ -465,7 +657,10 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
             "url": "{{baseUrl}}/api/wards",
             "body": {
               "mode": "raw",
@@ -487,6 +682,7 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/wards/{{wardId}}"
           }
         },
@@ -505,6 +701,7 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/wards"
           }
         },
@@ -523,6 +720,7 @@
           ],
           "request": {
             "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/wards/{{wardId}}/admit/{{patientId}}"
           }
         },
@@ -542,6 +740,7 @@
           ],
           "request": {
             "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/wards/2/admit/{{patientId}}"
           }
         },
@@ -559,6 +758,7 @@
           ],
           "request": {
             "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/wards/{{wardId}}/discharge/{{patientId}}"
           }
         }
@@ -584,7 +784,10 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
             "url": "{{baseUrl}}/api/paid-services",
             "body": {
               "mode": "raw",
@@ -606,6 +809,7 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/paid-services/{{serviceId}}"
           }
         },
@@ -624,6 +828,7 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/paid-services"
           }
         },
@@ -645,6 +850,7 @@
           ],
           "request": {
             "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/patients/{{patientId}}/paid-services/{{serviceId}}"
           }
         },
@@ -663,6 +869,7 @@
           ],
           "request": {
             "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/patients/{{patientId}}/paid-services/{{linkId}}/pay"
           }
         }
@@ -692,6 +899,7 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/admin/reports/ward-occupancy"
           }
         },
@@ -711,6 +919,7 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/admin/reports/paid-services-summary"
           }
         },
@@ -729,6 +938,7 @@
           ],
           "request": {
             "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": {
               "raw": "{{baseUrl}}/api/admin/patients/{{patientId}}/discharge?dischargeType=NORMAL",
               "query": [{ "key": "dischargeType", "value": "NORMAL" }]
@@ -750,6 +960,7 @@
           ],
           "request": {
             "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": {
               "raw": "{{baseUrl}}/api/admin/patients/3/discharge?dischargeType=FORCED",
               "query": [{ "key": "dischargeType", "value": "FORCED" }]
@@ -771,10 +982,870 @@
           ],
           "request": {
             "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": {
               "raw": "{{baseUrl}}/api/admin/patients/5/discharge?dischargeType=TRANSFER",
               "query": [{ "key": "dischargeType", "value": "TRANSFER" }]
             }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Client Portal",
+      "item": [
+        {
+          "name": "[Public] Get active doctors",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+                  "pm.test('Each doctor has specialty', () => {",
+                  "  pm.response.json().forEach(d => pm.expect(d.specialty).to.be.a('string'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/client/doctors"
+          }
+        },
+        {
+          "name": "[Public] Get departments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/client/departments"
+          }
+        },
+        {
+          "name": "[Public] Get active services",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+                  "pm.test('All services active', () => {",
+                  "  pm.response.json().forEach(s => pm.expect(s.active).to.be.true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/client/services"
+          }
+        },
+        {
+          "name": "[CLIENT] Book appointment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Status is PENDING', () => pm.expect(pm.response.json().status).to.eql('PENDING'));",
+                  "pm.test('Has doctorName', () => pm.expect(pm.response.json().doctorName).to.be.a('string'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/client/appointments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctorId\": {{doctorId}},\n  \"preferredDate\": \"2026-06-20\",\n  \"preferredTime\": \"14:00\",\n  \"contactPhone\": \"+7-900-123-4567\",\n  \"notes\": \"Первичный приём, жалобы на боли в спине\"\n}"
+            }
+          }
+        },
+        {
+          "name": "[CLIENT] Get my appointments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": "{{baseUrl}}/api/client/appointments/my"
+          }
+        },
+        {
+          "name": "[CLIENT] Order paid service",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Status is PENDING', () => pm.expect(pm.response.json().status).to.eql('PENDING'));",
+                  "pm.test('Has serviceName', () => pm.expect(pm.response.json().serviceName).to.be.a('string'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/client/service-orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceId\": {{serviceId}},\n  \"contactPhone\": \"+7-900-123-4567\",\n  \"notes\": \"Удобно в первой половине дня\"\n}"
+            }
+          }
+        },
+        {
+          "name": "[CLIENT] Get my service orders",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": "{{baseUrl}}/api/client/service-orders/my"
+          }
+        },
+        {
+          "name": "Book appointment without token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/client/appointments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctorId\": 1,\n  \"preferredDate\": \"2026-06-20\",\n  \"preferredTime\": \"10:00\",\n  \"contactPhone\": \"+7-900-000-0000\"\n}"
+            }
+          }
+        },
+        {
+          "name": "[ADMIN] Book appointment as admin → 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 Forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/client/appointments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctorId\": 1,\n  \"preferredDate\": \"2026-06-20\",\n  \"preferredTime\": \"10:00\",\n  \"contactPhone\": \"+7-900-000-0000\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chat",
+      "item": [
+        {
+          "name": "[CLIENT] Create/get support room → save roomId",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Type is SUPPORT', () => pm.expect(pm.response.json().type).to.eql('SUPPORT'));",
+                  "pm.test('Has id', () => pm.expect(pm.response.json().id).to.be.a('number'));",
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('roomId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": "{{baseUrl}}/api/chat/support"
+          }
+        },
+        {
+          "name": "[CLIENT] Create/get support room again → same roomId (idempotency)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Same roomId as before', () => {",
+                  "  pm.expect(pm.response.json().id).to.eql(parseInt(pm.collectionVariables.get('roomId')));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": "{{baseUrl}}/api/chat/support"
+          }
+        },
+        {
+          "name": "[ADMIN] Get all support rooms",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/api/chat/support"
+          }
+        },
+        {
+          "name": "[CLIENT] Get my rooms",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": "{{baseUrl}}/api/chat/my-rooms"
+          }
+        },
+        {
+          "name": "[DOCTOR] Get doctor rooms",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctorToken}}" }],
+            "url": "{{baseUrl}}/api/chat/doctor/rooms"
+          }
+        },
+        {
+          "name": "[CLIENT] Send message → save lastMessageId",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Has content', () => pm.expect(pm.response.json().content).to.be.a('string'));",
+                  "pm.test('Has senderId', () => pm.expect(pm.response.json().senderId).to.be.a('number'));",
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('lastMessageId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/chat/rooms/{{roomId}}/messages",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Здравствуйте, у меня вопрос по записи на приём\"\n}"
+            }
+          }
+        },
+        {
+          "name": "[ADMIN] Reply in chat",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Has content', () => pm.expect(pm.response.json().content).to.be.a('string'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/chat/rooms/{{roomId}}/messages",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Добрый день! Чем могу помочь?\"\n}"
+            }
+          }
+        },
+        {
+          "name": "[CLIENT] Poll messages (sinceId=0 — все сообщения)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+                  "pm.test('Has at least 1 message', () => pm.expect(pm.response.json().length).to.be.above(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/chat/rooms/{{roomId}}/messages/poll?sinceId=0",
+              "query": [{ "key": "sinceId", "value": "0" }]
+            }
+          }
+        },
+        {
+          "name": "[CLIENT] Poll messages (sinceId=lastMessageId — только новые)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+                  "pm.test('All messages are newer than lastMessageId', () => {",
+                  "  const sinceId = parseInt(pm.collectionVariables.get('lastMessageId'));",
+                  "  pm.response.json().forEach(m => pm.expect(m.id).to.be.above(sinceId));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/chat/rooms/{{roomId}}/messages/poll?sinceId={{lastMessageId}}",
+              "query": [{ "key": "sinceId", "value": "{{lastMessageId}}" }]
+            }
+          }
+        },
+        {
+          "name": "[CLIENT] Get message history",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": "{{baseUrl}}/api/chat/rooms/{{roomId}}/messages"
+          }
+        },
+        {
+          "name": "[CLIENT] Send blank message → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/chat/rooms/{{roomId}}/messages",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"   \"\n}"
+            }
+          }
+        },
+        {
+          "name": "POST /api/chat/support without token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/chat/support"
+          }
+        },
+        {
+          "name": "[ADMIN] POST /api/chat/support as admin → 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 Forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/api/chat/support"
+          }
+        },
+        {
+          "name": "[CLIENT] POST /api/chat/support as client → 403 GET doctor rooms",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 Forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": "{{baseUrl}}/api/chat/doctor/rooms"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Medical",
+      "item": [
+        {
+          "name": "[DOCTOR] Create document → save documentId",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Has type', () => pm.expect(pm.response.json().type).to.be.a('string'));",
+                  "pm.test('Has typeLabel', () => pm.expect(pm.response.json().typeLabel).to.be.a('string'));",
+                  "pm.test('active is true', () => pm.expect(pm.response.json().active).to.be.true);",
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('documentId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{doctorToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/medical/documents",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": {{patientId}},\n  \"type\": \"PRESCRIPTION\",\n  \"title\": \"Рецепт на амоксициллин\",\n  \"content\": \"Амоксициллин 500мг 3 раза в день в течение 7 дней\",\n  \"issuedAt\": \"2026-05-19\",\n  \"validUntil\": \"2026-06-19\"\n}"
+            }
+          }
+        },
+        {
+          "name": "[DOCTOR] Create document without validUntil (CERTIFICATE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('validUntil is null', () => pm.expect(pm.response.json().validUntil).to.be.null);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{doctorToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/medical/documents",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": {{patientId}},\n  \"type\": \"CERTIFICATE\",\n  \"title\": \"Справка о состоянии здоровья\",\n  \"content\": \"Пациент здоров, противопоказаний нет\",\n  \"issuedAt\": \"2026-05-19\"\n}"
+            }
+          }
+        },
+        {
+          "name": "[DOCTOR] Create note (hidden from client)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('visibleToClient is false', () => pm.expect(pm.response.json().visibleToClient).to.be.false);",
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('noteId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{doctorToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/medical/notes",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": {{patientId}},\n  \"type\": \"OBSERVATION\",\n  \"content\": \"Состояние стабильное, динамика положительная. Лечение продолжить.\",\n  \"visibleToClient\": false\n}"
+            }
+          }
+        },
+        {
+          "name": "[DOCTOR] Create note (visible to client)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('visibleToClient is true', () => pm.expect(pm.response.json().visibleToClient).to.be.true);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{doctorToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/medical/notes",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": {{patientId}},\n  \"type\": \"TREATMENT_PLAN\",\n  \"content\": \"Рекомендуется полный покой, обильное питьё, повторный осмотр через 7 дней.\",\n  \"visibleToClient\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "[DOCTOR] Get patient documents",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+                  "pm.test('All documents are active', () => {",
+                  "  pm.response.json().forEach(d => pm.expect(d.active).to.be.true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctorToken}}" }],
+            "url": "{{baseUrl}}/api/medical/documents/patient/{{patientId}}"
+          }
+        },
+        {
+          "name": "[DOCTOR] Get patient notes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctorToken}}" }],
+            "url": "{{baseUrl}}/api/medical/notes/patient/{{patientId}}"
+          }
+        },
+        {
+          "name": "[DOCTOR] Get patient full history",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Has patientId', () => pm.expect(pm.response.json().patientId).to.be.a('number'));",
+                  "pm.test('Has documents array', () => pm.expect(pm.response.json().documents).to.be.an('array'));",
+                  "pm.test('Has notes array', () => pm.expect(pm.response.json().notes).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctorToken}}" }],
+            "url": "{{baseUrl}}/api/medical/history/patient/{{patientId}}"
+          }
+        },
+        {
+          "name": "[CLIENT] Get my documents (only active, no hidden)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": "{{baseUrl}}/api/medical/documents/my"
+          }
+        },
+        {
+          "name": "[CLIENT] Get my history (only visible notes)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Has documents', () => pm.expect(pm.response.json().documents).to.be.an('array'));",
+                  "pm.test('Has notes', () => pm.expect(pm.response.json().notes).to.be.an('array'));",
+                  "pm.test('All notes are visible', () => {",
+                  "  pm.response.json().notes.forEach(n => pm.expect(n.visibleToClient).to.be.true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": "{{baseUrl}}/api/medical/history/my"
+          }
+        },
+        {
+          "name": "[DOCTOR] Archive document (soft-delete)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctorToken}}" }],
+            "url": "{{baseUrl}}/api/medical/documents/{{documentId}}"
+          }
+        },
+        {
+          "name": "[DOCTOR] Get patient history after archive → doc gone",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Archived doc not in list', () => {",
+                  "  const archivedId = parseInt(pm.collectionVariables.get('documentId'));",
+                  "  const ids = pm.response.json().documents.map(d => d.id);",
+                  "  pm.expect(ids).to.not.include(archivedId);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctorToken}}" }],
+            "url": "{{baseUrl}}/api/medical/history/patient/{{patientId}}"
+          }
+        },
+        {
+          "name": "Create document without title → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{doctorToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/medical/documents",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": {{patientId}},\n  \"type\": \"PRESCRIPTION\",\n  \"issuedAt\": \"2026-05-19\"\n}"
+            }
+          }
+        },
+        {
+          "name": "[CLIENT] POST /api/medical/documents as client → 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 Forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/medical/documents",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": 1,\n  \"type\": \"PRESCRIPTION\",\n  \"title\": \"Рецепт\",\n  \"issuedAt\": \"2026-05-19\"\n}"
+            }
+          }
+        },
+        {
+          "name": "GET /api/medical/documents/my without token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/medical/documents/my"
+          }
+        },
+        {
+          "name": "Get history for nonexistent patient → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctorToken}}" }],
+            "url": "{{baseUrl}}/api/medical/history/patient/99999"
           }
         }
       ]
@@ -797,6 +1868,7 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/patients/99999"
           }
         },
@@ -815,7 +1887,10 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
             "url": "{{baseUrl}}/api/patients",
             "body": {
               "mode": "raw",
@@ -837,7 +1912,25 @@
           ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
             "url": "{{baseUrl}}/api/doctors/99999"
+          }
+        },
+        {
+          "name": "Protected route without token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/patients"
           }
         }
       ]
