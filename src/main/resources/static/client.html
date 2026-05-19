@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ГКБ №1 — Запись на приём</title>
+<style>
+/* ───── Reset & Variables ───── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --blue:       #1d4ed8;
+  --blue-light: #3b82f6;
+  --blue-dark:  #1e3a8a;
+  --green:      #059669;
+  --green-light:#d1fae5;
+  --amber:      #d97706;
+  --amber-light:#fef3c7;
+  --red:        #dc2626;
+  --bg:         #f1f5f9;
+  --surface:    #ffffff;
+  --text:       #0f172a;
+  --muted:      #64748b;
+  --border:     #e2e8f0;
+  --shadow:     0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:  0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
+  --shadow-lg:  0 10px 15px rgba(0,0,0,.1), 0 4px 6px rgba(0,0,0,.05);
+  --radius:     12px;
+  --radius-sm:  8px;
+}
+body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
+a { text-decoration:none; color:inherit; }
+button { cursor:pointer; border:none; }
+input,select,textarea { font-family:inherit; }
+img { max-width:100%; }
+
+/* ───── Navbar ───── */
+.nav { background:var(--surface); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100; }
+.nav-inner { max-width:1200px; margin:0 auto; padding:0 24px; height:64px; display:flex; align-items:center; gap:32px; }
+.nav-logo { display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.1rem; color:var(--blue-dark); }
+.nav-logo svg { flex-shrink:0; }
+.nav-links { display:flex; gap:4px; margin-left:auto; }
+.nav-links a { padding:8px 14px; border-radius:var(--radius-sm); font-size:.9rem; color:var(--muted); transition:background .15s,color .15s; }
+.nav-links a:hover { background:var(--bg); color:var(--text); }
+.nav-auth { display:flex; gap:8px; margin-left:8px; }
+.btn-ghost { padding:8px 16px; border-radius:var(--radius-sm); font-size:.875rem; font-weight:500; color:var(--blue); background:transparent; border:1.5px solid var(--blue); transition:all .15s; }
+.btn-ghost:hover { background:var(--blue); color:#fff; }
+.btn-primary { padding:8px 16px; border-radius:var(--radius-sm); font-size:.875rem; font-weight:500; color:#fff; background:var(--blue); transition:background .15s; }
+.btn-primary:hover { background:var(--blue-dark); }
+.btn-sm { padding:6px 14px; font-size:.8rem; }
+.btn-green { background:var(--green); }
+.btn-green:hover { background:#047857; }
+#user-panel { display:none; align-items:center; gap:10px; }
+#user-name { font-size:.875rem; font-weight:500; }
+
+/* ───── Hero ───── */
+.hero { background:linear-gradient(135deg,var(--blue-dark) 0%,var(--blue) 60%,var(--blue-light) 100%); color:#fff; padding:80px 24px 96px; text-align:center; position:relative; overflow:hidden; }
+.hero::before { content:''; position:absolute; inset:0; background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"); }
+.hero-content { position:relative; max-width:700px; margin:0 auto; }
+.hero h1 { font-size:2.75rem; font-weight:800; line-height:1.2; margin-bottom:16px; }
+.hero p { font-size:1.15rem; opacity:.88; margin-bottom:36px; }
+.hero-btns { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+.btn-hero-primary { padding:14px 32px; border-radius:var(--radius); font-size:1rem; font-weight:600; background:#fff; color:var(--blue-dark); transition:all .15s; }
+.btn-hero-primary:hover { transform:translateY(-1px); box-shadow:var(--shadow-lg); }
+.btn-hero-secondary { padding:14px 32px; border-radius:var(--radius); font-size:1rem; font-weight:600; background:transparent; color:#fff; border:2px solid rgba(255,255,255,.6); transition:all .15s; }
+.btn-hero-secondary:hover { background:rgba(255,255,255,.1); border-color:#fff; }
+
+/* ───── Stats ───── */
+.stats { background:var(--surface); border-bottom:1px solid var(--border); }
+.stats-inner { max-width:1200px; margin:0 auto; padding:32px 24px; display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--border); }
+.stat { background:var(--surface); padding:24px; text-align:center; }
+.stat-num { font-size:2rem; font-weight:800; color:var(--blue); }
+.stat-label { font-size:.875rem; color:var(--muted); margin-top:4px; }
+
+/* ───── Section ───── */
+.section { padding:72px 24px; }
+.section-inner { max-width:1200px; margin:0 auto; }
+.section-header { text-align:center; margin-bottom:48px; }
+.section-header h2 { font-size:1.875rem; font-weight:700; margin-bottom:8px; }
+.section-header p { color:var(--muted); font-size:1rem; }
+
+/* ───── Filter tabs ───── */
+.filter-tabs { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-bottom:40px; }
+.filter-tab { padding:8px 18px; border-radius:20px; font-size:.875rem; font-weight:500; background:var(--surface); border:1.5px solid var(--border); color:var(--muted); cursor:pointer; transition:all .15s; }
+.filter-tab:hover,.filter-tab.active { background:var(--blue); border-color:var(--blue); color:#fff; }
+
+/* ───── Doctor cards ───── */
+.doctors-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:20px; }
+.doctor-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:24px; display:flex; flex-direction:column; gap:12px; box-shadow:var(--shadow); transition:box-shadow .2s,transform .2s; }
+.doctor-card:hover { box-shadow:var(--shadow-md); transform:translateY(-2px); }
+.doctor-avatar { width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.5rem; font-weight:700; color:#fff; flex-shrink:0; }
+.doctor-info { flex:1; }
+.doctor-name { font-weight:600; font-size:1rem; margin-bottom:4px; }
+.doctor-specialty { font-size:.8rem; font-weight:600; padding:3px 10px; border-radius:20px; display:inline-block; margin-bottom:6px; }
+.doctor-dept { font-size:.85rem; color:var(--muted); display:flex; align-items:center; gap:5px; }
+.doctor-cabinet { font-size:.8rem; color:var(--muted); }
+.book-btn { margin-top:auto; width:100%; padding:9px; border-radius:var(--radius-sm); font-size:.875rem; font-weight:500; background:var(--blue); color:#fff; transition:background .15s; }
+.book-btn:hover { background:var(--blue-dark); }
+
+/* ───── Services ───── */
+.services-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
+.service-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; display:flex; align-items:center; gap:16px; box-shadow:var(--shadow); transition:box-shadow .15s; }
+.service-card:hover { box-shadow:var(--shadow-md); }
+.service-icon { width:48px; height:48px; background:linear-gradient(135deg,#dbeafe,#eff6ff); border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0; }
+.service-body { flex:1; min-width:0; }
+.service-name { font-weight:600; font-size:.95rem; }
+.service-desc { font-size:.8rem; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.service-footer { display:flex; align-items:center; justify-content:space-between; margin-top:8px; }
+.service-price { font-weight:700; color:var(--blue); font-size:1rem; }
+.order-btn { padding:6px 14px; border-radius:var(--radius-sm); font-size:.8rem; font-weight:500; background:var(--blue); color:#fff; transition:background .15s; }
+.order-btn:hover { background:var(--blue-dark); }
+
+/* ───── How it works ───── */
+.how { background:var(--surface); }
+.steps { display:grid; grid-template-columns:repeat(3,1fr); gap:32px; }
+.step { text-align:center; padding:32px 24px; }
+.step-num { width:56px; height:56px; border-radius:50%; background:var(--blue); color:#fff; font-size:1.5rem; font-weight:800; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; }
+.step h3 { font-size:1.05rem; font-weight:600; margin-bottom:8px; }
+.step p { font-size:.875rem; color:var(--muted); }
+
+/* ───── Dashboard (logged-in) ───── */
+#dashboard { display:none; }
+.dashboard-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.dash-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:24px; box-shadow:var(--shadow); }
+.dash-card h3 { font-size:1.1rem; font-weight:600; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+.dash-item { padding:12px; border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom:8px; }
+.dash-item:last-child { margin-bottom:0; }
+.dash-item-title { font-weight:500; font-size:.9rem; }
+.dash-item-sub { font-size:.8rem; color:var(--muted); margin-top:2px; }
+.status-badge { font-size:.75rem; font-weight:600; padding:2px 8px; border-radius:20px; display:inline-block; margin-top:4px; }
+.status-PENDING { background:#fef3c7; color:#92400e; }
+.status-CONFIRMED { background:var(--green-light); color:#065f46; }
+.status-CANCELLED { background:#fee2e2; color:#991b1b; }
+.status-COMPLETED { background:#e0e7ff; color:#3730a3; }
+.empty-state { text-align:center; padding:32px; color:var(--muted); font-size:.9rem; }
+
+/* ───── Footer ───── */
+.footer { background:var(--blue-dark); color:rgba(255,255,255,.7); padding:40px 24px; margin-top:0; }
+.footer-inner { max-width:1200px; margin:0 auto; display:grid; grid-template-columns:2fr 1fr 1fr; gap:40px; }
+.footer-brand h3 { color:#fff; font-size:1.1rem; margin-bottom:8px; }
+.footer-brand p { font-size:.875rem; line-height:1.7; }
+.footer-col h4 { color:#fff; font-size:.9rem; font-weight:600; margin-bottom:12px; }
+.footer-col ul { list-style:none; }
+.footer-col li { font-size:.875rem; margin-bottom:6px; }
+.footer-bottom { border-top:1px solid rgba(255,255,255,.1); margin-top:32px; padding-top:24px; text-align:center; font-size:.8rem; }
+
+/* ───── Modal ───── */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:200; align-items:center; justify-content:center; padding:16px; }
+.modal-overlay.open { display:flex; }
+.modal { background:var(--surface); border-radius:var(--radius); width:100%; max-width:480px; box-shadow:var(--shadow-lg); overflow:hidden; animation:slideUp .2s ease; }
+@keyframes slideUp { from { transform:translateY(20px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+.modal-header { padding:20px 24px 0; display:flex; align-items:center; justify-content:space-between; }
+.modal-header h3 { font-size:1.1rem; font-weight:600; }
+.modal-close { width:32px; height:32px; border-radius:6px; background:var(--bg); color:var(--muted); font-size:1.2rem; display:flex; align-items:center; justify-content:center; transition:background .15s; }
+.modal-close:hover { background:var(--border); }
+.modal-body { padding:20px 24px 24px; }
+.modal-tabs { display:flex; border-bottom:1px solid var(--border); margin:-20px -24px 20px; }
+.modal-tab { flex:1; padding:12px; text-align:center; font-size:.9rem; font-weight:500; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; transition:all .15s; }
+.modal-tab.active { color:var(--blue); border-bottom-color:var(--blue); }
+.form-group { margin-bottom:16px; }
+.form-label { display:block; font-size:.85rem; font-weight:500; margin-bottom:6px; color:var(--text); }
+.form-control { width:100%; padding:10px 12px; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-size:.9rem; background:var(--surface); transition:border-color .15s; }
+.form-control:focus { outline:none; border-color:var(--blue-light); box-shadow:0 0 0 3px rgba(59,130,246,.15); }
+select.form-control { cursor:pointer; }
+.form-hint { font-size:.78rem; color:var(--muted); margin-top:4px; }
+.form-submit { width:100%; padding:12px; border-radius:var(--radius-sm); font-size:.95rem; font-weight:600; background:var(--blue); color:#fff; transition:background .15s; margin-top:8px; }
+.form-submit:hover { background:var(--blue-dark); }
+.form-error { color:var(--red); font-size:.82rem; margin-top:8px; display:none; }
+.divider { text-align:center; color:var(--muted); font-size:.85rem; margin:16px 0; position:relative; }
+.divider::before { content:''; position:absolute; top:50%; left:0; right:0; height:1px; background:var(--border); }
+.divider span { background:var(--surface); position:relative; padding:0 12px; }
+
+/* ───── Toast ───── */
+.toast-container { position:fixed; bottom:24px; right:24px; z-index:300; display:flex; flex-direction:column; gap:8px; }
+.toast { padding:12px 18px; border-radius:var(--radius-sm); font-size:.875rem; font-weight:500; color:#fff; box-shadow:var(--shadow-lg); animation:slideIn .25s ease; max-width:320px; }
+@keyframes slideIn { from { transform:translateX(100%); opacity:0; } to { transform:translateX(0); opacity:1; } }
+.toast-success { background:#059669; }
+.toast-error { background:#dc2626; }
+.toast-info { background:#1d4ed8; }
+
+/* ───── Utilities ───── */
+.hidden { display:none !important; }
+.loading { opacity:.5; pointer-events:none; }
+.spinner { width:20px; height:20px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; display:inline-block; vertical-align:middle; margin-right:6px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ───── Responsive ───── */
+@media (max-width:768px) {
+  .hero h1 { font-size:1.875rem; }
+  .stats-inner { grid-template-columns:repeat(2,1fr); }
+  .steps { grid-template-columns:1fr; }
+  .dashboard-grid { grid-template-columns:1fr; }
+  .footer-inner { grid-template-columns:1fr; gap:24px; }
+  .nav-links { display:none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ════ NAVBAR ════ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/client.html" class="nav-logo">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#1d4ed8"/><path d="M16 7v18M7 16h18" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>
+      ГКБ №1
+    </a>
+    <nav class="nav-links">
+      <a href="#doctors" onclick="scrollTo('doctors')">Врачи</a>
+      <a href="#services" onclick="scrollTo('services')">Услуги</a>
+      <a href="#departments" onclick="scrollTo('departments')">Отделения</a>
+      <a href="#how" onclick="scrollTo('how')">Как записаться</a>
+    </nav>
+    <div class="nav-auth" id="auth-buttons">
+      <button class="btn-ghost" onclick="openModal('login')">Войти</button>
+      <button class="btn-primary" onclick="openModal('login')">Записаться</button>
+    </div>
+    <div id="user-panel">
+      <span id="user-name"></span>
+      <button class="btn-ghost btn-sm" onclick="showDashboard()">Мои записи</button>
+      <button class="btn-ghost btn-sm" onclick="logout()">Выйти</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ════ HERO ════ -->
+<section class="hero">
+  <div class="hero-content">
+    <h1>Запишитесь к врачу&nbsp;онлайн</h1>
+    <p>Городская клиническая больница №1 — современная медицинская помощь.<br>Более 25 опытных специалистов в 10 отделениях.</p>
+    <div class="hero-btns">
+      <button class="btn-hero-primary" onclick="document.getElementById('doctors').scrollIntoView({behavior:'smooth'})">Найти врача</button>
+      <button class="btn-hero-secondary" onclick="document.getElementById('services').scrollIntoView({behavior:'smooth'})">Платные услуги</button>
+    </div>
+  </div>
+</section>
+
+<!-- ════ STATS ════ -->
+<div class="stats">
+  <div class="stats-inner">
+    <div class="stat"><div class="stat-num" id="stat-doctors">—</div><div class="stat-label">Врачей-специалистов</div></div>
+    <div class="stat"><div class="stat-num" id="stat-depts">—</div><div class="stat-label">Отделений</div></div>
+    <div class="stat"><div class="stat-num" id="stat-services">—</div><div class="stat-label">Видов услуг</div></div>
+    <div class="stat"><div class="stat-num">24/7</div><div class="stat-label">Режим работы</div></div>
+  </div>
+</div>
+
+<!-- ════ DOCTORS ════ -->
+<section class="section" id="doctors">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2>Наши специалисты</h2>
+      <p>Опытные врачи всех основных специальностей</p>
+    </div>
+    <div class="filter-tabs" id="specialty-tabs">
+      <button class="filter-tab active" onclick="filterDoctors(null, this)">Все</button>
+    </div>
+    <div class="doctors-grid" id="doctors-grid">
+      <div class="empty-state">Загружаем список врачей…</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ SERVICES ════ -->
+<section class="section" id="services" style="background:var(--surface);">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2>Платные услуги</h2>
+      <p>Широкий спектр диагностических и лечебных услуг</p>
+    </div>
+    <div class="services-grid" id="services-grid">
+      <div class="empty-state">Загружаем список услуг…</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ DEPARTMENTS ════ -->
+<section class="section" id="departments">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2>Отделения</h2>
+      <p>Полный спектр медицинской помощи под одной крышей</p>
+    </div>
+    <div class="services-grid" id="departments-grid">
+      <div class="empty-state">Загружаем…</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ HOW IT WORKS ════ -->
+<section class="section how" id="how">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2>Как записаться</h2>
+      <p>Три простых шага до приёма у специалиста</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Зарегистрируйтесь</h3>
+        <p>Создайте личный кабинет — это займёт меньше минуты</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>Выберите врача</h3>
+        <p>Найдите нужного специалиста и нажмите «Записаться»</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Ждите подтверждения</h3>
+        <p>Мы перезвоним и уточним удобное время приёма</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ DASHBOARD ════ -->
+<section class="section" id="dashboard">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2>Личный кабинет</h2>
+      <p id="dashboard-welcome"></p>
+    </div>
+    <div class="dashboard-grid">
+      <div class="dash-card">
+        <h3>🗓 Мои записи к врачу</h3>
+        <div id="my-appointments"><div class="empty-state">Нет записей</div></div>
+        <button class="btn-primary btn-sm" style="margin-top:16px" onclick="openModal('book')">+ Новая запись</button>
+      </div>
+      <div class="dash-card">
+        <h3>🔬 Мои заказы услуг</h3>
+        <div id="my-orders"><div class="empty-state">Нет заказов</div></div>
+        <button class="btn-primary btn-sm" style="margin-top:16px" onclick="document.getElementById('services').scrollIntoView({behavior:'smooth'})">Заказать услугу</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ FOOTER ════ -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <h3>ГКБ №1 — Городская клиническая больница №1</h3>
+      <p>Современная медицинская помощь для всей семьи. Опытные специалисты, новейшее оборудование, индивидуальный подход.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Навигация</h4>
+      <ul>
+        <li><a href="#doctors">Врачи</a></li>
+        <li><a href="#services">Услуги</a></li>
+        <li><a href="#departments">Отделения</a></li>
+        <li><a href="#how">Запись</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Контакты</h4>
+      <ul>
+        <li>г. Москва, ул. Примерная, д.1</li>
+        <li>+7 (495) 000-00-00</li>
+        <li>info@gkb1.ru</li>
+        <li>Пн–Пт: 08:00–20:00</li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-inner footer-bottom">© 2024 Городская клиническая больница №1. Все права защищены.</div>
+</footer>
+
+<!-- ════ MODAL: AUTH ════ -->
+<div class="modal-overlay" id="modal-login">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Личный кабинет</h3>
+      <button class="modal-close" onclick="closeModal('login')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-tabs">
+        <div class="modal-tab active" id="tab-login" onclick="switchTab('login')">Войти</div>
+        <div class="modal-tab" id="tab-register" onclick="switchTab('register')">Регистрация</div>
+      </div>
+
+      <!-- Login form -->
+      <form id="form-login" onsubmit="doLogin(event)">
+        <div class="form-group">
+          <label class="form-label">Логин</label>
+          <input class="form-control" id="login-username" placeholder="Ваш логин" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Пароль</label>
+          <input class="form-control" type="password" id="login-password" placeholder="Пароль" required autocomplete="current-password">
+        </div>
+        <div class="form-error" id="login-error"></div>
+        <button type="submit" class="form-submit" id="login-submit">Войти</button>
+        <div class="divider"><span>нет аккаунта?</span></div>
+        <button type="button" class="btn-ghost" style="width:100%;padding:10px;" onclick="switchTab('register')">Зарегистрироваться</button>
+      </form>
+
+      <!-- Register form -->
+      <form id="form-register" style="display:none" onsubmit="doRegister(event)">
+        <div class="form-group">
+          <label class="form-label">Полное имя</label>
+          <input class="form-control" id="reg-fullname" placeholder="Иванов Иван Иванович" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Логин</label>
+          <input class="form-control" id="reg-username" placeholder="Придумайте логин (мин. 3 символа)" required minlength="3">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Пароль</label>
+          <input class="form-control" type="password" id="reg-password" placeholder="Пароль (мин. 6 символов)" required minlength="6" autocomplete="new-password">
+        </div>
+        <div class="form-error" id="reg-error"></div>
+        <button type="submit" class="form-submit" id="reg-submit">Создать аккаунт</button>
+        <p class="form-hint" style="margin-top:8px;text-align:center">Регистрация занимает 30 секунд. Данные защищены.</p>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ════ MODAL: BOOK APPOINTMENT ════ -->
+<div class="modal-overlay" id="modal-book">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Запись к врачу</h3>
+      <button class="modal-close" onclick="closeModal('book')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-book" onsubmit="doBook(event)">
+        <div class="form-group">
+          <label class="form-label">Врач</label>
+          <select class="form-control" id="book-doctor" required>
+            <option value="">— Выберите врача —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Желаемая дата</label>
+          <input class="form-control" type="date" id="book-date" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Удобное время</label>
+          <select class="form-control" id="book-time">
+            <option value="">— Любое —</option>
+            <option>08:00–09:00</option><option>09:00–10:00</option>
+            <option>10:00–11:00</option><option>11:00–12:00</option>
+            <option>14:00–15:00</option><option>15:00–16:00</option>
+            <option>16:00–17:00</option><option>17:00–18:00</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Телефон для связи</label>
+          <input class="form-control" type="tel" id="book-phone" placeholder="+7 (___) ___-__-__">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Комментарий (необязательно)</label>
+          <textarea class="form-control" id="book-notes" rows="2" placeholder="Опишите жалобы или пожелания…"></textarea>
+        </div>
+        <div class="form-error" id="book-error"></div>
+        <button type="submit" class="form-submit">Записаться</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ════ MODAL: ORDER SERVICE ════ -->
+<div class="modal-overlay" id="modal-order">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="order-modal-title">Заказ услуги</h3>
+      <button class="modal-close" onclick="closeModal('order')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-order" onsubmit="doOrder(event)">
+        <input type="hidden" id="order-service-id">
+        <div class="form-group">
+          <label class="form-label">Услуга</label>
+          <input class="form-control" id="order-service-name" readonly style="background:var(--bg)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Телефон для связи</label>
+          <input class="form-control" type="tel" id="order-phone" placeholder="+7 (___) ___-__-__">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Комментарий (необязательно)</label>
+          <textarea class="form-control" id="order-notes" rows="2" placeholder="Пожелания, удобное время…"></textarea>
+        </div>
+        <div class="form-error" id="order-error"></div>
+        <button type="submit" class="form-submit">Оформить заказ</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ════ TOASTS ════ -->
+<div class="toast-container" id="toasts"></div>
+
+<script>
+const API = 'http://localhost:8090';
+let token = localStorage.getItem('clientToken');
+let currentUser = JSON.parse(localStorage.getItem('clientUser') || 'null');
+let allDoctors = [];
+let allServices = [];
+
+// ── Init ──
+window.addEventListener('DOMContentLoaded', () => {
+  setMinDate();
+  loadDoctors();
+  loadServices();
+  loadDepartments();
+  if (token && currentUser) updateAuthUI();
+});
+
+function setMinDate() {
+  const today = new Date();
+  today.setDate(today.getDate() + 1);
+  document.getElementById('book-date').min = today.toISOString().slice(0, 10);
+}
+
+// ── API helper ──
+async function api(path, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (token) opts.headers['Authorization'] = `Bearer ${token}`;
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API + path, opts);
+  if (res.status === 204) return null;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || `Ошибка ${res.status}`);
+  return data;
+}
+
+// ── Load data ──
+async function loadDoctors() {
+  try {
+    allDoctors = await api('/api/client/doctors');
+    document.getElementById('stat-doctors').textContent = allDoctors.length;
+    renderSpecialtyTabs();
+    renderDoctors(allDoctors);
+    populateDoctorSelect();
+  } catch (e) { console.error('Doctors load failed', e); }
+}
+
+async function loadServices() {
+  try {
+    allServices = await api('/api/client/services');
+    document.getElementById('stat-services').textContent = allServices.length;
+    renderServices(allServices);
+  } catch (e) { console.error('Services load failed', e); }
+}
+
+async function loadDepartments() {
+  try {
+    const depts = await api('/api/client/departments');
+    document.getElementById('stat-depts').textContent = depts.length;
+    renderDepartments(depts);
+  } catch (e) { console.error('Departments load failed', e); }
+}
+
+// ── Specialty colors ──
+const specialtyColors = {
+  CARDIOLOGIST: '#ef4444', SURGEON: '#f97316', NEUROLOGIST: '#8b5cf6',
+  ORTHOPEDIST:  '#06b6d4', ONCOLOGIST: '#ec4899', PEDIATRICIAN: '#10b981',
+  UROLOGIST:    '#f59e0b', THERAPIST:  '#3b82f6',
+};
+const specialtyLabels = {
+  CARDIOLOGIST: 'Кардиолог', SURGEON: 'Хирург', NEUROLOGIST: 'Невролог',
+  ORTHOPEDIST: 'Ортопед', ONCOLOGIST: 'Онколог', PEDIATRICIAN: 'Педиатр',
+  UROLOGIST: 'Уролог', THERAPIST: 'Терапевт',
+};
+
+function getSpecialtyColor(s) { return specialtyColors[s] || '#6b7280'; }
+function getSpecialtyLabel(s) { return specialtyLabels[s] || s; }
+function getInitials(name) {
+  const parts = name.split(' ');
+  return parts.length >= 2 ? (parts[0][0] + parts[1][0]) : name.slice(0, 2).toUpperCase();
+}
+
+// ── Render doctors ──
+function renderSpecialtyTabs() {
+  const specialties = [...new Set(allDoctors.map(d => d.specialty))].sort();
+  const tabs = document.getElementById('specialty-tabs');
+  specialties.forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-tab';
+    btn.textContent = getSpecialtyLabel(s);
+    btn.onclick = () => filterDoctors(s, btn);
+    tabs.appendChild(btn);
+  });
+}
+
+function filterDoctors(specialty, tabEl) {
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  tabEl.classList.add('active');
+  const filtered = specialty ? allDoctors.filter(d => d.specialty === specialty) : allDoctors;
+  renderDoctors(filtered);
+}
+
+function renderDoctors(doctors) {
+  const grid = document.getElementById('doctors-grid');
+  if (!doctors.length) { grid.innerHTML = '<div class="empty-state">Врачи не найдены</div>'; return; }
+  grid.innerHTML = doctors.map(d => {
+    const color = getSpecialtyColor(d.specialty);
+    const label = getSpecialtyLabel(d.specialty);
+    const initials = getInitials(d.fullName);
+    return `
+      <div class="doctor-card">
+        <div style="display:flex;gap:14px;align-items:flex-start">
+          <div class="doctor-avatar" style="background:${color}">${initials}</div>
+          <div class="doctor-info">
+            <div class="doctor-name">${d.fullName}</div>
+            <span class="doctor-specialty" style="background:${color}22;color:${color}">${label}</span>
+            <div class="doctor-dept">🏥 ${d.departmentName}</div>
+            <div class="doctor-cabinet">🚪 Кабинет ${d.cabinetNumber}</div>
+          </div>
+        </div>
+        <button class="book-btn" onclick="openBookForDoctor(${d.id},'${d.fullName}')">Записаться</button>
+      </div>`;
+  }).join('');
+}
+
+// ── Render services ──
+const serviceIcons = ['💊','🩺','🔬','🧪','💉','🩻','❤️','🫁','🧠','🦷','👁','🦴','🩸','🌡️','💊','🔬','🫀','🧬','🏥','⚕️'];
+function renderServices(services) {
+  const grid = document.getElementById('services-grid');
+  if (!services.length) { grid.innerHTML = '<div class="empty-state">Услуги не найдены</div>'; return; }
+  grid.innerHTML = services.map((s, i) => `
+    <div class="service-card">
+      <div class="service-icon">${serviceIcons[i % serviceIcons.length]}</div>
+      <div class="service-body">
+        <div class="service-name">${s.name}</div>
+        <div class="service-desc">${s.description || ''}</div>
+        <div class="service-footer">
+          <span class="service-price">${formatPrice(s.price)} ₽</span>
+          <button class="order-btn" onclick="openOrderForService(${s.id},'${escHtml(s.name)}')">Заказать</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+// ── Render departments ──
+const deptIcons = {'Кардиология':'❤️','Хирургия':'🔪','Неврология':'🧠','Ортопедия':'🦴','Онкология':'🔬','Педиатрия':'👶','Урология':'💧','Терапия':'⚕️','Офтальмология':'👁','Эндокринология':'🧬'};
+function renderDepartments(depts) {
+  const grid = document.getElementById('departments-grid');
+  grid.innerHTML = depts.map(d => {
+    const icon = deptIcons[d.name] || '🏥';
+    return `
+      <div class="service-card">
+        <div class="service-icon">${icon}</div>
+        <div class="service-body">
+          <div class="service-name">${d.name}</div>
+          <div class="service-desc">${d.description || ''}</div>
+          <div class="service-footer">
+            <span style="font-size:.8rem;color:var(--muted)">📍 ${d.location || ''}</span>
+            ${d.headDoctorName ? `<span style="font-size:.78rem;color:var(--muted)">Зав.: ${d.headDoctorName.split(' ').slice(0,2).join(' ')}</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function populateDoctorSelect() {
+  const sel = document.getElementById('book-doctor');
+  allDoctors.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = `${d.fullName} (${getSpecialtyLabel(d.specialty)}, ${d.departmentName})`;
+    sel.appendChild(opt);
+  });
+}
+
+// ── Auth ──
+async function doLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('login-submit');
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  btn.innerHTML = '<span class="spinner"></span>Вхожу…';
+  btn.disabled = true;
+  try {
+    const data = await api('/api/auth/login', 'POST', {
+      username: document.getElementById('login-username').value,
+      password: document.getElementById('login-password').value,
+    });
+    if (data.role !== 'ROLE_CLIENT') {
+      errEl.textContent = 'Этот портал предназначен для пациентов. Для входа используйте /index.html';
+      errEl.style.display = 'block';
+      return;
+    }
+    onLoginSuccess(data);
+    closeModal('login');
+    toast('Добро пожаловать, ' + (data.fullName || data.username) + '!', 'success');
+  } catch (err) {
+    errEl.textContent = 'Неверный логин или пароль';
+    errEl.style.display = 'block';
+  } finally {
+    btn.innerHTML = 'Войти';
+    btn.disabled = false;
+  }
+}
+
+async function doRegister(e) {
+  e.preventDefault();
+  const btn = document.getElementById('reg-submit');
+  const errEl = document.getElementById('reg-error');
+  errEl.style.display = 'none';
+  btn.innerHTML = '<span class="spinner"></span>Регистрирую…';
+  btn.disabled = true;
+  try {
+    const data = await api('/api/auth/register-client', 'POST', {
+      username: document.getElementById('reg-username').value,
+      password: document.getElementById('reg-password').value,
+      fullName: document.getElementById('reg-fullname').value,
+    });
+    onLoginSuccess(data);
+    closeModal('login');
+    toast('Аккаунт создан! Добро пожаловать, ' + (data.fullName || data.username) + '!', 'success');
+  } catch (err) {
+    errEl.textContent = err.message || 'Ошибка регистрации';
+    errEl.style.display = 'block';
+  } finally {
+    btn.innerHTML = 'Создать аккаунт';
+    btn.disabled = false;
+  }
+}
+
+function onLoginSuccess(data) {
+  token = data.token;
+  currentUser = { username: data.username, fullName: data.fullName, role: data.role };
+  localStorage.setItem('clientToken', token);
+  localStorage.setItem('clientUser', JSON.stringify(currentUser));
+  updateAuthUI();
+}
+
+function updateAuthUI() {
+  if (!currentUser) return;
+  document.getElementById('auth-buttons').style.display = 'none';
+  const panel = document.getElementById('user-panel');
+  panel.style.display = 'flex';
+  const name = currentUser.fullName ? currentUser.fullName.split(' ').slice(0, 2).join(' ') : currentUser.username;
+  document.getElementById('user-name').textContent = '👤 ' + name;
+}
+
+function logout() {
+  token = null; currentUser = null;
+  localStorage.removeItem('clientToken');
+  localStorage.removeItem('clientUser');
+  document.getElementById('auth-buttons').style.display = 'flex';
+  document.getElementById('user-panel').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'none';
+  toast('Вы вышли из системы', 'info');
+}
+
+// ── Book appointment ──
+function openBookForDoctor(doctorId, doctorName) {
+  if (!token) { openModal('login'); toast('Войдите, чтобы записаться', 'info'); return; }
+  const sel = document.getElementById('book-doctor');
+  sel.value = doctorId;
+  openModal('book');
+}
+
+async function doBook(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('book-error');
+  errEl.style.display = 'none';
+  try {
+    await api('/api/client/appointments', 'POST', {
+      doctorId:      +document.getElementById('book-doctor').value,
+      preferredDate: document.getElementById('book-date').value,
+      preferredTime: document.getElementById('book-time').value || null,
+      contactPhone:  document.getElementById('book-phone').value || null,
+      notes:         document.getElementById('book-notes').value || null,
+    });
+    closeModal('book');
+    document.getElementById('form-book').reset();
+    toast('Запись создана! Мы свяжемся с вами для подтверждения.', 'success');
+    loadMyData();
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+  }
+}
+
+// ── Order service ──
+function openOrderForService(serviceId, serviceName) {
+  if (!token) { openModal('login'); toast('Войдите, чтобы заказать услугу', 'info'); return; }
+  document.getElementById('order-service-id').value = serviceId;
+  document.getElementById('order-service-name').value = serviceName;
+  openModal('order');
+}
+
+async function doOrder(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('order-error');
+  errEl.style.display = 'none';
+  try {
+    await api('/api/client/service-orders', 'POST', {
+      serviceId:    +document.getElementById('order-service-id').value,
+      contactPhone: document.getElementById('order-phone').value || null,
+      notes:        document.getElementById('order-notes').value || null,
+    });
+    closeModal('order');
+    document.getElementById('form-order').reset();
+    toast('Заказ оформлен! Мы свяжемся с вами.', 'success');
+    loadMyData();
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+  }
+}
+
+// ── Dashboard ──
+async function showDashboard() {
+  if (!token) { openModal('login'); return; }
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('dashboard').scrollIntoView({ behavior: 'smooth' });
+  document.getElementById('dashboard-welcome').textContent =
+    'Здравствуйте, ' + (currentUser.fullName || currentUser.username) + '!';
+  await loadMyData();
+}
+
+async function loadMyData() {
+  if (!token) return;
+  try {
+    const [appts, orders] = await Promise.all([
+      api('/api/client/appointments/my'),
+      api('/api/client/service-orders/my'),
+    ]);
+    renderMyAppointments(appts);
+    renderMyOrders(orders);
+  } catch (e) { console.error('Dashboard load failed', e); }
+}
+
+function renderMyAppointments(appts) {
+  const el = document.getElementById('my-appointments');
+  if (!appts || !appts.length) { el.innerHTML = '<div class="empty-state">Записей пока нет</div>'; return; }
+  el.innerHTML = appts.map(a => `
+    <div class="dash-item">
+      <div class="dash-item-title">${a.doctorName}</div>
+      <div class="dash-item-sub">${a.departmentName} · ${a.doctorSpecialty ? getSpecialtyLabel(a.doctorSpecialty) : ''}</div>
+      <div class="dash-item-sub">📅 ${formatDate(a.preferredDate)}${a.preferredTime ? ' · ' + a.preferredTime : ''}</div>
+      <span class="status-badge status-${a.status}">${statusLabel(a.status)}</span>
+    </div>`).join('');
+}
+
+function renderMyOrders(orders) {
+  const el = document.getElementById('my-orders');
+  if (!orders || !orders.length) { el.innerHTML = '<div class="empty-state">Заказов пока нет</div>'; return; }
+  el.innerHTML = orders.map(o => `
+    <div class="dash-item">
+      <div class="dash-item-title">${o.serviceName}</div>
+      <div class="dash-item-sub">💰 ${formatPrice(o.servicePrice)} ₽</div>
+      <div class="dash-item-sub">📅 ${formatDate(o.createdAt)}</div>
+      <span class="status-badge status-${o.status}">${statusLabel(o.status)}</span>
+    </div>`).join('');
+}
+
+// ── Modals ──
+function openModal(name) {
+  document.getElementById('modal-' + name).classList.add('open');
+}
+function closeModal(name) {
+  document.getElementById('modal-' + name).classList.remove('open');
+}
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+});
+
+function switchTab(tab) {
+  document.getElementById('form-login').style.display = tab === 'login' ? 'block' : 'none';
+  document.getElementById('form-register').style.display = tab === 'register' ? 'block' : 'none';
+  document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+  document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+}
+
+// ── Toast ──
+function toast(message, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = message;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ── Helpers ──
+function formatPrice(n) { return Number(n).toLocaleString('ru-RU'); }
+function formatDate(s) { return s ? new Date(s).toLocaleDateString('ru-RU') : '—'; }
+function escHtml(s) { return s.replace(/'/g, "\\'"); }
+function statusLabel(s) {
+  return {PENDING:'Ожидает',CONFIRMED:'Подтверждено',CANCELLED:'Отменено',COMPLETED:'Выполнено'}[s] || s;
+}
+</script>
+</body>
+</html>

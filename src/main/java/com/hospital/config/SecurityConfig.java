@@ -146,8 +146,15 @@ public class SecurityConfig {
                  * Они отдаются браузеру до аутентификации — логика входа на /login.html
                  * выполняется через JavaScript, который уже получает токен от /api/auth/login.
                  */
-                .requestMatchers("/", "/index.html", "/login.html", "/register.html",
+                .requestMatchers("/", "/index.html", "/login.html", "/register.html", "/client.html",
                                  "/css/**", "/js/**", "/favicon.ico").permitAll()
+
+                // Публичные GET-эндпоинты пациентского портала (просмотр без авторизации)
+                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                 "/api/client/doctors", "/api/client/departments", "/api/client/services").permitAll()
+
+                // Запись на приём и заказы — только для клиентов (ROLE_CLIENT)
+                .requestMatchers("/api/client/**").hasRole("CLIENT")
 
                 /**
                  * hasRole("ADMIN") — требует роль ADMIN у аутентифицированного пользователя.

@@ -154,4 +154,23 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new AuthResponse(token, user.getUsername(), user.getFullName(), user.getRole().name()));
     }
+
+    @PostMapping("/register-client")
+    @Operation(summary = "Регистрация пациента на портале (роль: CLIENT)")
+    public ResponseEntity<AuthResponse> registerClient(@RequestBody @Valid RegisterRequest request) {
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new BusinessRuleException("Пользователь с логином '" + request.getUsername() + "' уже существует");
+        }
+        User user = User.builder()
+                .username(request.getUsername())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .fullName(request.getFullName())
+                .role(Role.ROLE_CLIENT)
+                .active(true)
+                .build();
+        userRepository.save(user);
+        String token = jwtUtil.generateToken(user);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new AuthResponse(token, user.getUsername(), user.getFullName(), user.getRole().name()));
+    }
 }

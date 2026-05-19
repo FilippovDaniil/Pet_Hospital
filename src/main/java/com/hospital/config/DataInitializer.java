@@ -54,16 +54,23 @@ public class DataInitializer implements ApplicationRunner {
      */
     @Override
     public void run(ApplicationArguments args) {
-        // Создаём администратора только если таблица пуста (первый запуск).
-        if (userRepository.count() == 0) {
+        createIfAbsent("admin",   "admin123",   "Главный Администратор",   Role.ROLE_ADMIN);
+        createIfAbsent("doctor1", "doctor123",  "Иванов Сергей Петрович",  Role.ROLE_DOCTOR);
+        createIfAbsent("nurse1",  "nurse123",   "Медсестра Петрова А.В.",  Role.ROLE_NURSE);
+        createIfAbsent("client1", "client123",  "Клиент Тестовый Иван",    Role.ROLE_CLIENT);
+        createIfAbsent("client2", "client123",  "Клиент Тестовый Мария",   Role.ROLE_CLIENT);
+    }
+
+    private void createIfAbsent(String username, String password, String fullName, Role role) {
+        if (!userRepository.existsByUsername(username)) {
             userRepository.save(User.builder()
-                    .username("admin")
-                    .password(passwordEncoder.encode("admin123")) // BCrypt-хэш
-                    .fullName("Главный Администратор")
-                    .role(Role.ROLE_ADMIN)
+                    .username(username)
+                    .password(passwordEncoder.encode(password))
+                    .fullName(fullName)
+                    .role(role)
                     .active(true)
                     .build());
-            log.info("Default admin user created: login=admin, password=admin123");
+            log.info("Created default user: login={}, role={}", username, role);
         }
     }
 }

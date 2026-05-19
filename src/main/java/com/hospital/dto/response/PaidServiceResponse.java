@@ -1,6 +1,9 @@
 package com.hospital.dto.response;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
@@ -19,6 +22,9 @@ import java.math.BigDecimal;
  * сохранить историю назначений, ссылающихся на уже недействующую услугу.
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class PaidServiceResponse {
 
     /** Уникальный идентификатор услуги в БД. */

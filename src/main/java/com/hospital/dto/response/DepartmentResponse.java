@@ -1,6 +1,9 @@
 package com.hospital.dto.response;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * DTO ответа с данными отделения (GET /api/departments/{id} и другие эндпоинты).
@@ -21,6 +24,9 @@ import lombok.Data;
  * он доступен через отдельные эндпоинты с пагинацией.
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class DepartmentResponse {
 
     /** Уникальный идентификатор отделения в БД. */

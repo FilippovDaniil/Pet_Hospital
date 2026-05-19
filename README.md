@@ -34,6 +34,7 @@
 25. [Бизнес-правила системы](#25-бизнес-правила-системы)
 26. [Ролевой интерфейс — фронтенд](#26-ролевой-интерфейс--фронтенд)
 27. [Мониторинг: Loki + Grafana](#27-мониторинг-loki--grafana)
+28. [Клиентский портал](#28-клиентский-портал)
 
 ---
 
@@ -399,15 +400,49 @@ public class User implements UserDetails {
 
 `User` реализует интерфейс `UserDetails` — это требование Spring Security. Метод `getAuthorities()` возвращает роль пользователя как `GrantedAuthority`.
 
+### Appointment — запись на приём (клиентский портал)
+
+```java
+@Entity @Table(name = "appointment")
+public class Appointment {
+    Long id;
+    User clientUser;         // @ManyToOne — пользователь с ролью ROLE_CLIENT
+    Doctor doctor;           // @ManyToOne — выбранный врач
+    LocalDate preferredDate; // желаемая дата
+    String preferredTime;    // желаемое время (например "14:00")
+    String contactPhone;
+    String notes;
+    AppointmentStatus status; // PENDING → CONFIRMED / CANCELLED
+    LocalDateTime createdAt;
+}
+```
+
+### ClientServiceOrder — заказ платной услуги (клиентский портал)
+
+```java
+@Entity @Table(name = "client_service_order")
+public class ClientServiceOrder {
+    Long id;
+    User clientUser;           // @ManyToOne — ROLE_CLIENT
+    PaidService paidService;   // @ManyToOne — выбранная услуга
+    String contactPhone;
+    String notes;
+    ClientServiceOrderStatus status; // PENDING → CONFIRMED / COMPLETED / CANCELLED
+    LocalDateTime createdAt;
+}
+```
+
 ### Перечисления (Enums)
 
 ```java
-enum Gender        { MALE, FEMALE }
-enum PatientStatus { TREATMENT, DISCHARGED, TRANSFERRED }
-enum Role          { ROLE_ADMIN, ROLE_DOCTOR, ROLE_NURSE }
-enum Specialty     { CARDIOLOGIST, SURGEON, THERAPIST, NEUROLOGIST,
-                     PEDIATRICIAN, ORTHOPEDIST, ONCOLOGIST, UROLOGIST }
-enum DischargeType { NORMAL, FORCED, TRANSFER }
+enum Gender                  { MALE, FEMALE }
+enum PatientStatus            { TREATMENT, DISCHARGED, TRANSFERRED }
+enum Role                    { ROLE_ADMIN, ROLE_DOCTOR, ROLE_NURSE, ROLE_CLIENT }
+enum Specialty               { CARDIOLOGIST, SURGEON, THERAPIST, NEUROLOGIST,
+                               PEDIATRICIAN, ORTHOPEDIST, ONCOLOGIST, UROLOGIST }
+enum DischargeType            { NORMAL, FORCED, TRANSFER }
+enum AppointmentStatus        { PENDING, CONFIRMED, CANCELLED }
+enum ClientServiceOrderStatus { PENDING, CONFIRMED, COMPLETED, CANCELLED }
 ```
 
 ---
@@ -469,6 +504,43 @@ CREATE TABLE users (
     created_at TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 ```
+
+#### V4__client_schema.sql
+
+Создаёт таблицы клиентского портала:
+
+```sql
+CREATE TABLE appointment (
+    id              BIGSERIAL    PRIMARY KEY,
+    client_user_id  BIGINT       NOT NULL REFERENCES users(id),
+    doctor_id       BIGINT       NOT NULL REFERENCES doctor(id),
+    preferred_date  DATE         NOT NULL,
+    preferred_time  VARCHAR(20),
+    contact_phone   VARCHAR(25),
+    notes           TEXT,
+    status          VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
+    created_at      TIMESTAMP    NOT NULL DEFAULT now()
+);
+
+CREATE TABLE client_service_order (
+    id              BIGSERIAL    PRIMARY KEY,
+    client_user_id  BIGINT       NOT NULL REFERENCES users(id),
+    paid_service_id BIGINT       NOT NULL REFERENCES paid_service(id),
+    ...
+);
+```
+
+#### V5__extended_seed_data.sql
+
+Расширенные тестовые данные для реалистичной работы системы:
+
+| Тип данных | Количество |
+|---|---|
+| Новые отделения | 8 (итого ~10) |
+| Новые врачи | 22 (итого ~25) |
+| Новые палаты | 32 (итого ~36) |
+| Новые пациенты | 40 (итого ~45) |
+| Новые платные услуги | 20 (итого ~22) |
 
 ---
 
@@ -662,7 +734,8 @@ public void dischargePatient(Long patientId, DischargeType type) {
 | Метод | URL | Доступ | Описание |
 |---|---|---|---|
 | POST | `/api/auth/login` | Все | Вход. Возвращает JWT + info о пользователе |
-| POST | `/api/auth/register` | Все | Регистрация. Роль: `ROLE_NURSE` по умолчанию |
+| POST | `/api/auth/register` | Все | Регистрация персонала. Роль: `ROLE_NURSE` по умолчанию |
+| POST | `/api/auth/register-client` | Все | Регистрация пациента на портале. Роль: `ROLE_CLIENT` |
 
 **Запрос login:**
 ```json
@@ -740,6 +813,18 @@ public void dischargePatient(Long patientId, DischargeType type) {
 | GET | `/api/admin/reports/ward-occupancy` | Отчёт по заполненности палат (кэш Redis) |
 | GET | `/api/admin/reports/paid-services-summary` | Финансовая сводка (кэш Redis) |
 | POST | `/api/admin/patients/{patientId}/discharge` | Выписать (?type=NORMAL\|FORCED\|TRANSFER) |
+
+### Клиентский портал `/api/client`
+
+| Метод | URL | Доступ | Описание |
+|---|---|---|---|
+| GET | `/api/client/doctors` | Все (без токена) | Список активных врачей |
+| GET | `/api/client/departments` | Все (без токена) | Список активных отделений |
+| GET | `/api/client/services` | Все (без токена) | Список активных платных услуг |
+| POST | `/api/client/appointments` | `ROLE_CLIENT` | Записаться на приём к врачу |
+| GET | `/api/client/appointments/my` | `ROLE_CLIENT` | Мои записи на приём |
+| POST | `/api/client/service-orders` | `ROLE_CLIENT` | Заказать платную услугу |
+| GET | `/api/client/service-orders/my` | `ROLE_CLIENT` | Мои заказы услуг |
 
 ### Формат страничного ответа `PageResponse<T>`
 
@@ -1725,8 +1810,8 @@ docker-compose ps
 > Сервис `app` зависит от `postgres`, `redis`, `kafka`, `loki` — Docker Compose дождётся их готовности (`service_healthy`) перед запуском приложения. Первый запуск занимает ~90 секунд (сборка JAR внутри контейнера).
 
 При старте приложения происходит автоматически:
-- Flyway применяет миграции V1 → V2 → V3
-- `DataInitializer` создаёт пользователя `admin / admin123`
+- Flyway применяет миграции V1 → V2 → V3 → V4 → V5 (расширенные тестовые данные)
+- `DataInitializer` создаёт 5 пользователей: admin, doctor1, nurse1, client1, client2
 - `loki4j` начинает отправлять логи в Loki на `http://loki:3100`
 
 #### Шаг 2 — Открыть интерфейсы
@@ -1734,6 +1819,7 @@ docker-compose ps
 | Интерфейс | URL | Учётные данные |
 |---|---|---|
 | **Web-интерфейс (HIS)** | http://localhost:8090 | admin / admin123 |
+| **Клиентский портал** | http://localhost:8090/client.html | client1 / client123 |
 | Swagger UI | http://localhost:8090/swagger-ui.html | — |
 | API Docs | http://localhost:8090/api-docs | — |
 | Actuator Health | http://localhost:8090/actuator/health | — |
@@ -1806,17 +1892,18 @@ docker-compose down -v
 
 ### Первый вход
 
-`DataInitializer` создаёт администратора автоматически:
+`DataInitializer` создаёт всех пользователей автоматически при первом старте:
 
-```
-Логин:   admin
-Пароль:  admin123
-Роль:    ROLE_ADMIN
-```
+| Логин | Пароль | Роль | Интерфейс |
+|---|---|---|---|
+| `admin` | `admin123` | ROLE_ADMIN | http://localhost:8090 |
+| `doctor1` | `doctor123` | ROLE_DOCTOR | http://localhost:8090 |
+| `nurse1` | `nurse123` | ROLE_NURSE | http://localhost:8090 |
+| `client1` | `client123` | ROLE_CLIENT | http://localhost:8090/client.html |
+| `client2` | `client123` | ROLE_CLIENT | http://localhost:8090/client.html |
 
-Для создания врача или медсестры — зарегистрироваться через http://localhost:8090/register.html.
-По умолчанию все новые пользователи получают роль `ROLE_NURSE`.
-Сменить роль можно только напрямую в БД или через SQL-запрос.
+Для создания врача или медсестры — зарегистрироваться через http://localhost:8090/register.html (роль `ROLE_NURSE`).
+Для регистрации нового клиента — через http://localhost:8090/client.html → "Зарегистрироваться" (роль `ROLE_CLIENT`).
 
 **Получить JWT-токен через curl:**
 ```bash
@@ -2187,4 +2274,92 @@ PostgreSQL              v
 
     Redis <- @Cacheable / @CacheEvict в AdminServiceImpl
     AOP   <- оборачивает все методы Service, логирует время
+```
+
+---
+
+## 28. Клиентский портал
+
+### Назначение
+
+Публичная веб-страница для пациентов: запись к врачу и заказ платных услуг. Доступна без регистрации для просмотра, требует входа для записи. Полностью отделена от административного интерфейса `index.html`.
+
+**URL:** `http://localhost:8090/client.html`
+
+### Учётные данные (тестовые)
+
+| Логин | Пароль | Описание |
+|---|---|---|
+| `client1` | `client123` | Тестовый клиент «Иван» |
+| `client2` | `client123` | Тестовый клиент «Мария» |
+
+Зарегистрировать нового клиента: кнопка «Зарегистрироваться» на портале, или `POST /api/auth/register-client`.
+
+### Функциональность страницы
+
+| Блок | Описание | Авторизация |
+|---|---|---|
+| Hero + CTA | Заголовок, кнопки «Записаться» и «Войти» | Нет |
+| Статистика | Счётчики врачей, отделений, услуг | Нет |
+| Врачи | Карточки с фото-аватаром, специализацией, кабинетом, фильтрация по специализации | Нет |
+| Услуги | Карточки с ценами, кнопки «Заказать» | Нет (кнопка заказа требует входа) |
+| Отделения | Карточки с описанием и расположением | Нет |
+| «Как это работает» | Объяснение процесса записи | Нет |
+| Личный кабинет | Мои записи и заказы с статусами | ROLE_CLIENT |
+| Модальное окно входа/регистрации | Вход через `/api/auth/login`, регистрация через `/api/auth/register-client` | Нет |
+| Модальное окно записи к врачу | Выбор врача, даты, времени, телефона | ROLE_CLIENT |
+| Модальное окно заказа услуги | Выбор услуги, телефон, примечание | ROLE_CLIENT |
+
+### Архитектура frontend
+
+```
+client.html
+├── CSS — встроенные стили, градиенты, grid-раскладка
+├── HTML — секции: hero, stats, doctors, services, departments, how-it-works, footer
+│           + модальные окна: auth, appointment, service-order
+│           + личный кабинет (показывается после входа)
+└── JS (встроенный, без фреймворков)
+    ├── state: { token, username, fullName, role }
+    ├── API-функции: fetchDoctors(), fetchDepartments(), fetchServices()
+    ├── Auth-функции: login(), register(), logout()
+    ├── Booking-функции: bookAppointment(), orderService()
+    ├── Dashboard-функции: loadMyAppointments(), loadMyOrders()
+    └── UI-функции: renderDoctors(), toast(), openModal(), closeModal()
+```
+
+### Backend: новые компоненты
+
+| Компонент | Путь | Назначение |
+|---|---|---|
+| `ClientController` | `controller/ClientController.java` | REST `/api/client/**` |
+| `ClientService` | `service/ClientService.java` | Интерфейс сервисного слоя |
+| `ClientServiceImpl` | `service/impl/ClientServiceImpl.java` | Реализация |
+| `Appointment` | `entity/Appointment.java` | JPA-сущность записи на приём |
+| `ClientServiceOrder` | `entity/ClientServiceOrder.java` | JPA-сущность заказа услуги |
+| `AppointmentRepository` | `repository/AppointmentRepository.java` | JPA-репозиторий |
+| `ClientServiceOrderRepository` | `repository/ClientServiceOrderRepository.java` | JPA-репозиторий |
+| `AppointmentRequest/Response` | `dto/request\|response/` | DTO записи |
+| `ServiceOrderRequest/Response` | `dto/request\|response/` | DTO заказа |
+| `PublicDoctorResponse` | `dto/response/PublicDoctorResponse.java` | Публичная инфо о враче |
+
+### Безопасность
+
+Публичные `GET`-эндпоинты (`/api/client/doctors`, `/api/client/departments`, `/api/client/services`) настроены в `SecurityConfig` как `permitAll()` — JWT не требуется.
+
+Для операций записи (`POST /api/client/appointments`, `POST /api/client/service-orders`) и просмотра своих записей (`GET /api/client/*/my`) требуется токен с ролью `ROLE_CLIENT`.
+
+Пользователи с ролями `ROLE_ADMIN`, `ROLE_DOCTOR`, `ROLE_NURSE` не могут войти на клиентский портал (фронтенд отвергает их при входе с подсказкой открыть `index.html`).
+
+### Модель данных клиентского портала
+
+```
+users (ROLE_CLIENT)
+    |
+    +-- (1:N) appointment ----------- doctor
+    |             ↓ status
+    |        PENDING / CONFIRMED / CANCELLED
+    |
+    +-- (1:N) client_service_order -- paid_service
+                  ↓ status
+             PENDING / CONFIRMED / COMPLETED / CANCELLED
 ```
