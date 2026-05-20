@@ -1,7 +1,16 @@
 package com.hospital.entity;
 
+/**
+ * Категория позиции склада медсестры.
+ *
+ * Значения хранятся в БД как строки (EnumType.STRING в MedicalSupply),
+ * что делает схему читаемой и устойчивой к изменению порядка констант.
+ *
+ * Русские ярлыки для UI определены в NurseServiceImpl.CATEGORY_LABELS,
+ * а не здесь — чтобы не смешивать доменную модель с UI-логикой.
+ */
 public enum SupplyCategory {
-    MEDICINE,
-    CONSUMABLE,
-    EQUIPMENT
+    MEDICINE,    // медикаменты: таблетки, ампулы, сиропы
+    CONSUMABLE,  // расходники: шприцы, бинты, перчатки, маски
+    EQUIPMENT    // оборудование: тонометры, термометры, капельницы
 }

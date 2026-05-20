@@ -76,7 +76,25 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     @Query("SELECT COUNT(m) FROM ChatMessage m WHERE m.room.id = :roomId AND m.read = false AND m.sender.id <> :userId")
     long countUnread(@Param("roomId") Long roomId, @Param("userId") Long userId);
 
-    /** Помечает все непрочитанные сообщения от других участников как прочитанные. */
+    /**
+     * Помечает входящие сообщения комнаты как прочитанные для указанного пользователя.
+     *
+     * <p>Условия UPDATE:
+     * <ul>
+     *   <li>{@code m.room.id = :roomId}      — только сообщения данной комнаты.</li>
+     *   <li>{@code m.sender.id <> :userId}   — только входящие (не собственные) сообщения.</li>
+     *   <li>{@code m.read = false}            — только ещё непрочитанные (оптимизация: не трогаем уже прочитанные).</li>
+     * </ul>
+     *
+     * <p>{@code @Modifying} — обязателен для DML-запросов (UPDATE/DELETE) в Spring Data JPA.
+     * Без него Spring Data ожидает SELECT и выбрасывает исключение.
+     *
+     * <p>Вызывается в {@code getRoomMessages} и {@code pollMessages} (ChatServiceImpl),
+     * что гарантирует: бейдж «непрочитанных» сбрасывается в момент просмотра/опроса.
+     *
+     * @param roomId идентификатор чат-комнаты
+     * @param userId идентификатор пользователя, который читает (его собственные сообщения не трогаем)
+     */
     @Modifying
     @Query("UPDATE ChatMessage m SET m.read = true WHERE m.room.id = :roomId AND m.sender.id <> :userId AND m.read = false")
     void markMessagesAsRead(@Param("roomId") Long roomId, @Param("userId") Long userId);

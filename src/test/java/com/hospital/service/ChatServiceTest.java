@@ -450,6 +450,41 @@ class ChatServiceTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // markMessagesAsRead — вызов при чтении сообщений
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * getRoomMessages должен помечать входящие сообщения как прочитанные.
+     * Именно этот вызов убирает красную цифру (unread badge) у собеседника.
+     * Параметры: roomId и userId читателя (не трогаем сообщения, отправленные самим читателем).
+     */
+    @Test
+    void getRoomMessages_callsMarkAsRead() {
+        when(chatRoomRepository.findById(10L)).thenReturn(Optional.of(supportRoom));
+        when(chatMessageRepository.findByRoomIdOrderBySentAt(10L)).thenReturn(List.of(chatMessage));
+
+        chatService.getRoomMessages(10L, clientUser);
+
+        // Убеждаемся, что UPDATE прочитанности вызван с правильными аргументами.
+        verify(chatMessageRepository).markMessagesAsRead(10L, 1L);
+    }
+
+    /**
+     * pollMessages должен помечать входящие сообщения как прочитанные при каждом опросе.
+     * Это гарантирует, что badge сбрасывается даже если новых сообщений нет (пустой poll).
+     */
+    @Test
+    void pollMessages_callsMarkAsRead() {
+        when(chatRoomRepository.findById(10L)).thenReturn(Optional.of(supportRoom));
+        when(chatMessageRepository.findByRoomIdAndIdGreaterThan(10L, 50L)).thenReturn(List.of());
+
+        chatService.pollMessages(10L, 50L, clientUser);
+
+        // markMessagesAsRead должен вызываться независимо от наличия новых сообщений.
+        verify(chatMessageRepository).markMessagesAsRead(10L, 1L);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // lastMessage в ответе комнаты
     // ─────────────────────────────────────────────────────────────────────────
 

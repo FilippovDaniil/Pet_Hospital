@@ -33,9 +33,20 @@ public class ClientServiceOrder {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    /**
+     * Предпочтительная дата записи на процедуру.
+     * Устанавливается клиентом при оформлении заказа; null — если дата не выбрана.
+     * Фронтенд ограничивает выбор только будними днями (isWeekend() в client.html).
+     */
     @Column(name = "preferred_date")
     private LocalDate preferredDate;
 
+    /**
+     * Предпочтительное время записи.
+     * Допустимые значения генерируются фронтендом на основе PaidService.slotMinutes:
+     * 30-минутные или 60-минутные слоты в диапазоне 10:00–19:00.
+     * null — если время не выбрано.
+     */
     @Column(name = "preferred_time")
     private LocalTime preferredTime;
 

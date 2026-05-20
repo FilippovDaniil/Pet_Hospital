@@ -294,6 +294,8 @@ public class ChatServiceImpl implements ChatService {
     @Transactional
     public List<ChatMessageResponse> getRoomMessages(Long roomId, User requester) {
         ChatRoom room = getAccessibleRoom(roomId, requester);
+        // Помечаем входящие сообщения как прочитанные — сбрасывает unread badge у собеседника.
+        // UPDATE WHERE sender_id != requester.id AND read = false — только входящие и непрочитанные.
         chatMessageRepository.markMessagesAsRead(room.getId(), requester.getId());
         return chatMessageRepository.findByRoomIdOrderBySentAt(room.getId()).stream()
                 .map(this::toMessageResponse)
@@ -365,6 +367,8 @@ public class ChatServiceImpl implements ChatService {
     @Transactional
     public List<ChatMessageResponse> pollMessages(Long roomId, Long sinceId, User requester) {
         ChatRoom room = getAccessibleRoom(roomId, requester);
+        // Сбрасываем unread badge при каждом poll — даже если новых сообщений нет.
+        // Это гарантирует, что значок «непрочитанных» исчезнет в течение одного poll-интервала.
         chatMessageRepository.markMessagesAsRead(room.getId(), requester.getId());
         return chatMessageRepository.findByRoomIdAndIdGreaterThan(room.getId(), sinceId).stream()
                 .map(this::toMessageResponse)
