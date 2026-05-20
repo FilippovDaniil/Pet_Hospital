@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -188,4 +189,12 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
            "AND (cast(:q as String) IS NULL OR LOWER(p.fullName) LIKE LOWER(CONCAT('%', cast(:q as String), '%'))) " +
            "AND (:status IS NULL OR p.status = :status)")
     Page<Patient> search(@Param("q") String q, @Param("status") PatientStatus status, Pageable pageable);
+
+    /** Активные пациенты данного врача, у которых есть аккаунт на клиентском портале. */
+    @Query("SELECT p FROM Patient p JOIN FETCH p.clientUser WHERE p.currentDoctor.id = :doctorId AND p.active = true AND p.clientUser IS NOT NULL")
+    List<Patient> findActivePatientsWithClientUserByDoctorId(@Param("doctorId") Long doctorId);
+
+    /** Активные пациенты данного клиента с назначенным и активным врачом, у которого есть аккаунт. */
+    @Query("SELECT p FROM Patient p JOIN FETCH p.currentDoctor d JOIN FETCH d.linkedUser WHERE p.clientUser.id = :clientUserId AND p.active = true AND d.active = true AND d.linkedUser IS NOT NULL")
+    List<Patient> findActivePatientsWithDoctorByClientUserId(@Param("clientUserId") Long clientUserId);
 }

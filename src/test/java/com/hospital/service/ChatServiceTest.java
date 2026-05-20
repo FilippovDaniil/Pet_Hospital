@@ -8,6 +8,8 @@ import com.hospital.exception.BusinessRuleException;
 import com.hospital.exception.ResourceNotFoundException;
 import com.hospital.repository.ChatMessageRepository;
 import com.hospital.repository.ChatRoomRepository;
+import com.hospital.repository.DoctorRepository;
+import com.hospital.repository.PatientRepository;
 import com.hospital.repository.UserRepository;
 import com.hospital.service.impl.ChatServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +56,12 @@ class ChatServiceTest {
     /** Репозиторий пользователей — подменяется mock-объектом. */
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private DoctorRepository doctorRepository;
+
+    @Mock
+    private PatientRepository patientRepository;
 
     /**
      * Тестируемый объект. Mockito создаёт его и внедряет все @Mock-поля
@@ -263,6 +271,8 @@ class ChatServiceTest {
     /** Врач получает список комнат только со своими пациентами. */
     @Test
     void getDoctorRooms_returnsOnlyDoctorsRooms() {
+        // Авто-создание: doctorRepository не находит entity → пропуск авто-создания.
+        when(doctorRepository.findByLinkedUserIdAndActiveTrue(2L)).thenReturn(Optional.empty());
         when(chatRoomRepository.findDoctorRoomsByStaffUserId(2L)).thenReturn(List.of(doctorRoom));
         when(chatMessageRepository.countUnread(20L, 2L)).thenReturn(1L);
         when(chatMessageRepository.findByRoomIdOrderBySentAt(20L)).thenReturn(List.of());
@@ -276,6 +286,8 @@ class ChatServiceTest {
     /** Клиент видит все свои чаты (поддержка + врачи). */
     @Test
     void getMyRooms_returnsAllRoomsForClient() {
+        // Авто-создание: у клиента нет пациентов с назначенным врачом → пропуск авто-создания.
+        when(patientRepository.findActivePatientsWithDoctorByClientUserId(1L)).thenReturn(List.of());
         when(chatRoomRepository.findByClientUserId(1L)).thenReturn(List.of(supportRoom, doctorRoom));
         when(chatMessageRepository.countUnread(anyLong(), eq(1L))).thenReturn(0L);
         when(chatMessageRepository.findByRoomIdOrderBySentAt(anyLong())).thenReturn(List.of());

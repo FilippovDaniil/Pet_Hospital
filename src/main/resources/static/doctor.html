@@ -896,9 +896,9 @@ function renderAppointments(list) {
 
 async function openChatWithClient(clientUserId) {
   navigate('chats');
-  await loadChats();
   try {
     const room = await api(`/api/chat/doctor/${clientUserId}`, 'POST');
+    await loadChats();
     if (room?.id) openChatRoom(room.id, room.clientName || 'Клиент');
   } catch(e) { toast('Не удалось открыть чат', 'error'); }
 }

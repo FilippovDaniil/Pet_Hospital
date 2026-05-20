@@ -8,6 +8,8 @@ import com.hospital.exception.BusinessRuleException;
 import com.hospital.exception.ResourceNotFoundException;
 import com.hospital.repository.ChatMessageRepository;
 import com.hospital.repository.ChatRoomRepository;
+import com.hospital.repository.DoctorRepository;
+import com.hospital.repository.PatientRepository;
 import com.hospital.repository.UserRepository;
 import com.hospital.service.ChatService;
 import lombok.RequiredArgsConstructor;
@@ -66,6 +68,12 @@ public class ChatServiceImpl implements ChatService {
      * действительно принадлежит врачу, а не любому другому пользователю системы.
      */
     private final UserRepository userRepository;
+
+    /** Репозиторий врачей — для поиска doctor-entity по linkedUserId при авто-создании комнат. */
+    private final DoctorRepository doctorRepository;
+
+    /** Репозиторий пациентов — для поиска пациентов с клиентскими аккаунтами. */
+    private final PatientRepository patientRepository;
 
     // ─────────────────────────────────────────────────────────────────────────
     // Публичные методы интерфейса ChatService
@@ -217,9 +225,24 @@ public class ChatServiceImpl implements ChatService {
      * НЕ отправлял этот врач и которые ещё не помечены как прочитанные.
      */
     @Override
+    @Transactional
     public List<ChatRoomResponse> getDoctorRooms(User doctorUser) {
-        // findDoctorRoomsByStaffUserId — кастомный JPQL с JOIN FETCH clientUser,
-        // чтобы при маппинге в DTO не было ленивых SELECT для каждого clientUser.
+        // Авто-создаём комнаты для пациентов, у которых есть аккаунт портала,
+        // но комнаты ещё нет — чтобы врач сразу видел всех подключённых пациентов.
+        doctorRepository.findByLinkedUserIdAndActiveTrue(doctorUser.getId()).ifPresent(doctor ->
+            patientRepository.findActivePatientsWithClientUserByDoctorId(doctor.getId()).forEach(patient -> {
+                Long clientId = patient.getClientUser().getId();
+                chatRoomRepository
+                    .findByTypeAndClientUserIdAndStaffUserId(ChatRoomType.DOCTOR_CLIENT, clientId, doctorUser.getId())
+                    .orElseGet(() -> chatRoomRepository.save(
+                        ChatRoom.builder()
+                            .type(ChatRoomType.DOCTOR_CLIENT)
+                            .clientUser(patient.getClientUser())
+                            .staffUser(doctorUser)
+                            .build()
+                    ));
+            })
+        );
         return chatRoomRepository.findDoctorRoomsByStaffUserId(doctorUser.getId()).stream()
                 .map(r -> toRoomResponse(r, doctorUser.getId()))
                 .toList();
@@ -237,7 +260,21 @@ public class ChatServiceImpl implements ChatService {
      * фронтенда, который может отобразить иконку/подпись при необходимости.
      */
     @Override
+    @Transactional
     public List<ChatRoomResponse> getMyRooms(User client) {
+        // Авто-создаём комнату с назначенным врачом, если её ещё нет.
+        patientRepository.findActivePatientsWithDoctorByClientUserId(client.getId()).forEach(patient -> {
+            User doctorUser = patient.getCurrentDoctor().getLinkedUser();
+            chatRoomRepository
+                .findByTypeAndClientUserIdAndStaffUserId(ChatRoomType.DOCTOR_CLIENT, client.getId(), doctorUser.getId())
+                .orElseGet(() -> chatRoomRepository.save(
+                    ChatRoom.builder()
+                        .type(ChatRoomType.DOCTOR_CLIENT)
+                        .clientUser(client)
+                        .staffUser(doctorUser)
+                        .build()
+                ));
+        });
         return chatRoomRepository.findByClientUserId(client.getId()).stream()
                 .map(r -> toRoomResponse(r, client.getId()))
                 .toList();
