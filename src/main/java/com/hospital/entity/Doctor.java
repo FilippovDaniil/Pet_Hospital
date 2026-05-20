@@ -3,6 +3,8 @@ package com.hospital.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 /**
  * Сущность «Врач» — медицинский работник, закреплённый за отделением.
  *
@@ -106,4 +108,8 @@ public class Doctor {
     @JoinColumn(name = "user_id")
     @ToString.Exclude
     private User linkedUser;
+
+    /** Момент последнего открытия раздела «Приёмы». Используется для расчёта бейджа новых приёмов. */
+    @Column(name = "appointments_viewed_at")
+    private LocalDateTime appointmentsViewedAt;
 }

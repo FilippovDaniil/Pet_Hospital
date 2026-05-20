@@ -11,6 +11,7 @@ import com.hospital.entity.User;
 import com.hospital.repository.UserRepository;
 
 import java.util.List;
+import java.util.Map;
 import com.hospital.service.DoctorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -73,6 +74,13 @@ public class DoctorController {
     public ResponseEntity<List<AppointmentResponse>> getMyAppointments(Authentication auth) {
         User user = userRepository.findByUsername(auth.getName()).orElseThrow();
         return ResponseEntity.ok(doctorService.getMyAppointments(user.getId()));
+    }
+
+    @GetMapping("/me/appointments/count-new")
+    @Operation(summary = "Количество новых приёмов с момента последнего просмотра (для бейджа)")
+    public ResponseEntity<Map<String, Long>> getNewAppointmentsCount(Authentication auth) {
+        User user = userRepository.findByUsername(auth.getName()).orElseThrow();
+        return ResponseEntity.ok(Map.of("count", doctorService.getNewAppointmentsCount(user.getId())));
     }
 
     /**

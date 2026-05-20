@@ -185,9 +185,13 @@ public class DoctorServiceImpl implements DoctorService {
     }
 
     @Override
+    @Transactional
     public List<AppointmentResponse> getMyAppointments(Long userId) {
         Doctor doctor = doctorRepository.findByLinkedUserIdAndActiveTrue(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor for user", userId));
+        // Фиксируем момент просмотра — бейдж обнулится после этого вызова.
+        doctor.setAppointmentsViewedAt(LocalDateTime.now());
+        doctorRepository.save(doctor);
         return appointmentRepository.findByDoctorIdWithDetails(doctor.getId()).stream()
                 .map(a -> AppointmentResponse.builder()
                         .id(a.getId())
@@ -203,6 +207,17 @@ public class DoctorServiceImpl implements DoctorService {
                         .createdAt(a.getCreatedAt())
                         .build())
                 .toList();
+    }
+
+    @Override
+    public long getNewAppointmentsCount(Long userId) {
+        Doctor doctor = doctorRepository.findByLinkedUserIdAndActiveTrue(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor for user", userId));
+        if (doctor.getAppointmentsViewedAt() == null) {
+            // Врач ещё не смотрел раздел — показываем все PENDING-приёмы (поведение как сейчас).
+            return appointmentRepository.countByDoctorId(doctor.getId());
+        }
+        return appointmentRepository.countNewByDoctorIdSince(doctor.getId(), doctor.getAppointmentsViewedAt());
     }
 
     /**

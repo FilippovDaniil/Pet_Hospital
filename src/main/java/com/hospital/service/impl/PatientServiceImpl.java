@@ -314,16 +314,21 @@ public class PatientServiceImpl implements PatientService {
         if (patient.getClientUser() != null && doctor.getLinkedUser() != null) {
             User clientUser = patient.getClientUser();
             User doctorUser = doctor.getLinkedUser();
-            chatRoomRepository
+            boolean created = chatRoomRepository
                 .findByTypeAndClientUserIdAndStaffUserId(
                     ChatRoomType.DOCTOR_CLIENT, clientUser.getId(), doctorUser.getId())
-                .orElseGet(() -> chatRoomRepository.save(
+                .isEmpty();
+            if (created) {
+                chatRoomRepository.save(
                     ChatRoom.builder()
                         .type(ChatRoomType.DOCTOR_CLIENT)
                         .clientUser(clientUser)
                         .staffUser(doctorUser)
                         .build()
-                ));
+                );
+                log.info("Auto-created DOCTOR_CLIENT chat room for patient={} (clientUser={}) and doctor={} (staffUser={})",
+                    patientId, clientUser.getId(), doctorId, doctorUser.getId());
+            }
         }
 
         // Шаг 5: Открываем новую запись в истории назначений.

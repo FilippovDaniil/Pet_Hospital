@@ -439,9 +439,24 @@ async function init() {
     myDoctor = await api('/api/doctors/me');
     renderDoctorProfile();
     loadDashboard();
+    checkAppointmentsBadge();
+    setInterval(checkAppointmentsBadge, 30000);
   } catch(e) {
     toast('Ваш аккаунт не привязан к записи врача. Обратитесь к администратору.', 'error');
   }
+}
+
+async function checkAppointmentsBadge() {
+  try {
+    const res = await api('/api/doctors/me/appointments/count-new');
+    const badge = document.getElementById('badge-appointments');
+    if (res?.count > 0) {
+      badge.textContent = res.count;
+      badge.style.display = 'inline-flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch(e) {}
 }
 
 function renderDoctorProfile() {
@@ -837,10 +852,8 @@ async function loadAppointments() {
   el.innerHTML = '<div class="empty"><span class="spinner"></span> Загрузка…</div>';
   try {
     allAppointments = await api('/api/doctors/me/appointments') || [];
-    const badge = document.getElementById('badge-appointments');
-    const pending = allAppointments.filter(a => a.status === 'PENDING').length;
-    if (pending > 0) { badge.textContent = pending; badge.style.display = 'inline-flex'; }
-    else badge.style.display = 'none';
+    // GET /appointments обновляет appointmentsViewedAt на бэкенде — прячем бейдж.
+    document.getElementById('badge-appointments').style.display = 'none';
     renderAppointments(allAppointments);
   } catch(e) { el.innerHTML = '<div class="empty">Ошибка загрузки</div>'; }
 }

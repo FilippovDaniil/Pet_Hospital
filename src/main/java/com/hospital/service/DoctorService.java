@@ -144,4 +144,13 @@ public interface DoctorService {
      * @return список записей на приём с данными клиента
      */
     List<AppointmentResponse> getMyAppointments(Long userId);
+
+    /**
+     * Возвращает количество новых приёмов с момента последнего просмотра врачом.
+     * Если врач ещё ни разу не смотрел раздел — считаются все PENDING-приёмы.
+     *
+     * @param userId идентификатор пользователя (users.id из JWT)
+     * @return количество «непросмотренных» приёмов для бейджа
+     */
+    long getNewAppointmentsCount(Long userId);
 }
