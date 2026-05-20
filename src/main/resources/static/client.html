@@ -423,7 +423,10 @@ select.form-control { cursor:pointer; }
         <div class="form-group"><label class="form-label">Врач</label>
           <select class="form-control" id="book-doctor" required><option value="">— Выберите врача —</option></select>
         </div>
-        <div class="form-group"><label class="form-label">Желаемая дата</label><input class="form-control" type="date" id="book-date" required></div>
+        <div class="form-group"><label class="form-label">Желаемая дата</label>
+          <input class="form-control" type="date" id="book-date" required onchange="checkBookDateWeekend()">
+          <div id="book-date-warn" style="display:none;color:#d97706;font-size:0.8rem;margin-top:4px"></div>
+        </div>
         <div class="form-group"><label class="form-label">Удобное время</label>
           <select class="form-control" id="book-time">
             <option value="">— Любое —</option>
@@ -482,6 +485,23 @@ window.addEventListener('DOMContentLoaded', () => {
 function setMinDate() {
   const t = new Date(); t.setDate(t.getDate() + 1);
   document.getElementById('book-date').min = t.toISOString().slice(0, 10);
+}
+
+function isWeekend(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const day = new Date(y, m - 1, d).getDay();
+  return day === 0 || day === 6;
+}
+
+function checkBookDateWeekend() {
+  const val = document.getElementById('book-date').value;
+  const warn = document.getElementById('book-date-warn');
+  if (val && isWeekend(val)) {
+    warn.textContent = 'Приём в выходные не ведётся. Выберите рабочий день (пн–пт).';
+    warn.style.display = 'block';
+  } else {
+    warn.style.display = 'none';
+  }
 }
 
 function scrollToId(id) { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); }
@@ -697,10 +717,16 @@ function openBookForDoctor(doctorId) {
 async function doBook(e) {
   e.preventDefault();
   const errEl = document.getElementById('book-error'); errEl.style.display = 'none';
+  const dateVal = document.getElementById('book-date').value;
+  if (isWeekend(dateVal)) {
+    errEl.textContent = 'Нельзя записаться на выходной день. Выберите рабочий день (пн–пт).';
+    errEl.style.display = 'block';
+    return;
+  }
   try {
     await api('/api/client/appointments', 'POST', {
       doctorId:      +document.getElementById('book-doctor').value,
-      preferredDate: document.getElementById('book-date').value,
+      preferredDate: dateVal,
       preferredTime: document.getElementById('book-time').value || null,
       contactPhone:  document.getElementById('book-phone').value || null,
       notes:         document.getElementById('book-notes').value || null,
