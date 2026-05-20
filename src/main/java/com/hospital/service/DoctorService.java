@@ -122,4 +122,14 @@ public interface DoctorService {
      * @return постраничный список пациентов этого врача
      */
     PageResponse<PatientResponse> getPatients(Long doctorId, Pageable pageable);
+
+    /**
+     * Возвращает профиль врача по идентификатору связанного пользователя (userId из JWT).
+     * Используется в личном кабинете врача: doctor.html вызывает GET /api/doctors/me
+     * и получает свой профиль без явного doctorId.
+     *
+     * @param userId идентификатор пользователя (users.id)
+     * @return данные врача, привязанного к этому пользователю
+     */
+    DoctorResponse getMe(Long userId);
 }

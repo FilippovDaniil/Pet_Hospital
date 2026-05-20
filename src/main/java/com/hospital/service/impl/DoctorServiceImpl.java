@@ -170,6 +170,17 @@ public class DoctorServiceImpl implements DoctorService {
     }
 
     /**
+     * Возвращает профиль врача по userId из JWT (для личного кабинета врача).
+     * findByLinkedUserIdAndActiveTrue — ищет активного врача с doctor.user_id = userId.
+     */
+    @Override
+    public DoctorResponse getMe(Long userId) {
+        Doctor doctor = doctorRepository.findByLinkedUserIdAndActiveTrue(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor for user", userId));
+        return doctorMapper.toResponse(doctor);
+    }
+
+    /**
      * Вспомогательный метод: найти активного врача или выбросить 404.
      * findByIdAndActiveTrue — Spring Data: SELECT * FROM doctor WHERE id=? AND active=true.
      */

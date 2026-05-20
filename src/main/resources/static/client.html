@@ -267,7 +267,7 @@ select.form-control { cursor:pointer; }
     </div>
     <div id="user-panel">
       <span id="user-name"></span>
-      <button class="btn-ghost btn-sm" onclick="showDashboard()">Кабинет</button>
+      <button class="btn-ghost btn-sm" onclick="location.href='/account.html'">Кабинет</button>
       <button class="btn-ghost btn-sm" onclick="logout()">Выйти</button>
     </div>
   </div>
@@ -352,92 +352,6 @@ select.form-control { cursor:pointer; }
   </div>
 </section>
 
-<!-- ════ DASHBOARD ════ -->
-<section class="section" id="dashboard">
-  <div class="section-inner">
-    <div class="account-header">
-      <div>
-        <h2>Личный кабинет</h2>
-        <p id="dashboard-welcome" style="color:var(--muted);font-size:.95rem;margin-top:4px"></p>
-      </div>
-      <button class="btn-ghost btn-sm" onclick="loadDashboardData()">↻ Обновить</button>
-    </div>
-
-    <!-- Tabs -->
-    <div class="account-tabs-bar">
-      <button class="account-tab active" onclick="showTab('tab-overview')">📊 Сводка</button>
-      <button class="account-tab" onclick="showTab('tab-appts')">🗓 Записи</button>
-      <button class="account-tab" onclick="showTab('tab-orders')">🔬 Услуги</button>
-      <button class="account-tab" onclick="showTab('tab-docs')">📄 Документы</button>
-      <button class="account-tab" onclick="showTab('tab-history')">📋 История</button>
-      <button class="account-tab" onclick="showTab('tab-support');openSupportChat()">💬 Поддержка <span class="tab-badge hidden" id="badge-support">0</span></button>
-      <button class="account-tab" onclick="showTab('tab-doctor')">👨‍⚕️ Чат с врачом <span class="tab-badge hidden" id="badge-doctor">0</span></button>
-    </div>
-
-    <!-- ── Сводка ── -->
-    <div class="account-panel active" id="tab-overview">
-      <div class="summary-grid">
-        <div class="summary-card"><div class="summary-num" id="sum-appts">—</div><div class="summary-label">Записей к врачу</div></div>
-        <div class="summary-card"><div class="summary-num" id="sum-orders">—</div><div class="summary-label">Заказов услуг</div></div>
-        <div class="summary-card"><div class="summary-num" id="sum-docs">—</div><div class="summary-label">Медицинских документов</div></div>
-        <div class="summary-card"><div class="summary-num" id="sum-notes">—</div><div class="summary-label">Записей в истории</div></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-        <div>
-          <h3 style="font-size:1rem;font-weight:600;margin-bottom:12px">Последние записи</h3>
-          <div id="recent-appts"><div class="empty-state">Нет записей</div></div>
-        </div>
-        <div>
-          <h3 style="font-size:1rem;font-weight:600;margin-bottom:12px">Последние заказы</h3>
-          <div id="recent-orders"><div class="empty-state">Нет заказов</div></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Записи к врачу ── -->
-    <div class="account-panel" id="tab-appts">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-        <button class="btn-primary btn-sm" onclick="openModal('book')">+ Новая запись</button>
-      </div>
-      <div id="all-appts"><div class="empty-state">Нет записей</div></div>
-    </div>
-
-    <!-- ── Заказы услуг ── -->
-    <div class="account-panel" id="tab-orders">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-        <button class="btn-primary btn-sm" onclick="scrollToId('services')">Заказать услугу</button>
-      </div>
-      <div id="all-orders"><div class="empty-state">Нет заказов</div></div>
-    </div>
-
-    <!-- ── Медицинские документы ── -->
-    <div class="account-panel" id="tab-docs">
-      <p style="color:var(--muted);font-size:.875rem;margin-bottom:20px">Рецепты, направления и другие документы, выданные вашим лечащим врачом.</p>
-      <div id="my-documents"><div class="empty-state">Медицинских документов пока нет</div></div>
-    </div>
-
-    <!-- ── История болезни ── -->
-    <div class="account-panel" id="tab-history">
-      <p style="color:var(--muted);font-size:.875rem;margin-bottom:20px">Диагнозы, наблюдения и заметки, которые ваш врач отметил как доступные вам.</p>
-      <div id="my-history"><div class="empty-state">История пока пуста</div></div>
-    </div>
-
-    <!-- ── Поддержка ── -->
-    <div class="account-panel" id="tab-support">
-      <p style="color:var(--muted);font-size:.875rem;margin-bottom:16px">Задайте любой вопрос — наши специалисты ответят в рабочее время.</p>
-      <div id="support-chat-wrap">
-        <div class="chat-loading">Загружаем чат…</div>
-      </div>
-    </div>
-
-    <!-- ── Чат с врачом ── -->
-    <div class="account-panel" id="tab-doctor">
-      <p style="color:var(--muted);font-size:.875rem;margin-bottom:16px">Напишите лечащему врачу — доступно, если врач подключён к порталу.</p>
-      <div id="doctor-chat-rooms" class="chat-room-list" style="margin-bottom:20px"></div>
-      <div id="doctor-chat-wrap"></div>
-    </div>
-  </div>
-</section>
 
 <!-- ════ FOOTER ════ -->
 <footer class="footer">
@@ -554,15 +468,6 @@ let currentUser = JSON.parse(localStorage.getItem('clientUser') || 'null');
 let allDoctors = [];
 let allServices = [];
 
-// Chat state
-let supportRoomId = null;
-let supportLastId = 0;
-let supportPollTimer = null;
-let doctorRoomId = null;
-let doctorLastId = 0;
-let doctorPollTimer = null;
-
-// ── Init ──
 window.addEventListener('DOMContentLoaded', () => {
   setMinDate();
   loadDoctors();
@@ -575,13 +480,12 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 function setMinDate() {
-  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-  document.getElementById('book-date').min = tomorrow.toISOString().slice(0, 10);
+  const t = new Date(); t.setDate(t.getDate() + 1);
+  document.getElementById('book-date').min = t.toISOString().slice(0, 10);
 }
 
 function scrollToId(id) { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); }
 
-// ── API helper ──
 async function api(path, method = 'GET', body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (token) opts.headers['Authorization'] = 'Bearer ' + token;
@@ -593,7 +497,6 @@ async function api(path, method = 'GET', body = null) {
   return data;
 }
 
-// ── Load public data ──
 async function loadDoctors() {
   try {
     allDoctors = await api('/api/client/doctors');
@@ -620,7 +523,6 @@ async function loadDepartments() {
   } catch (e) { console.error('Departments:', e); }
 }
 
-// ── Specialty helpers ──
 const specialtyColors = {
   CARDIOLOGIST:'#ef4444',SURGEON:'#f97316',NEUROLOGIST:'#8b5cf6',ORTHOPEDIST:'#06b6d4',
   ONCOLOGIST:'#ec4899',PEDIATRICIAN:'#10b981',UROLOGIST:'#f59e0b',THERAPIST:'#3b82f6',
@@ -633,7 +535,6 @@ function sColor(s){ return specialtyColors[s]||'#6b7280'; }
 function sLabel(s){ return specialtyLabels[s]||s; }
 function initials(name){ const p=name.split(' '); return p.length>=2?p[0][0]+p[1][0]:name.slice(0,2).toUpperCase(); }
 
-// ── Render doctors ──
 function renderSpecialtyTabs() {
   const specialties = [...new Set(allDoctors.map(d => d.specialty))].sort();
   const tabs = document.getElementById('specialty-tabs');
@@ -672,7 +573,6 @@ function renderDoctors(doctors) {
   }).join('');
 }
 
-// ── Render services ──
 const svcIcons = ['💊','🩺','🔬','🧪','💉','🩻','❤️','🫁','🧠','🦷','👁','🦴','🩸','🌡️','💊','🔬','🫀','🧬','🏥','⚕️'];
 function renderServices(services) {
   const grid = document.getElementById('services-grid');
@@ -691,7 +591,6 @@ function renderServices(services) {
     </div>`).join('');
 }
 
-// ── Render departments ──
 const deptIcons = {'Кардиология':'❤️','Хирургия':'🔪','Неврология':'🧠','Ортопедия':'🦴','Онкология':'🔬','Педиатрия':'👶','Урология':'💧','Терапия':'⚕️','Офтальмология':'👁','Эндокринология':'🧬'};
 function renderDepartments(depts) {
   const grid = document.getElementById('departments-grid');
@@ -721,14 +620,12 @@ function populateDoctorSelect() {
   });
 }
 
-// ── Auth ──
 async function doLogin(e) {
   e.preventDefault();
   const btn = document.getElementById('login-submit');
   const errEl = document.getElementById('login-error');
   errEl.style.display = 'none';
-  btn.innerHTML = '<span class="spinner"></span>Вхожу…';
-  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Вхожу…'; btn.disabled = true;
   try {
     const data = await api('/api/auth/login', 'POST', {
       username: document.getElementById('login-username').value,
@@ -742,8 +639,7 @@ async function doLogin(e) {
     closeModal('login');
     toast('Добро пожаловать, ' + (data.fullName || data.username) + '!', 'success');
   } catch(err) {
-    errEl.textContent = 'Неверный логин или пароль';
-    errEl.style.display = 'block';
+    errEl.textContent = 'Неверный логин или пароль'; errEl.style.display = 'block';
   } finally { btn.innerHTML = 'Войти'; btn.disabled = false; }
 }
 
@@ -752,8 +648,7 @@ async function doRegister(e) {
   const btn = document.getElementById('reg-submit');
   const errEl = document.getElementById('reg-error');
   errEl.style.display = 'none';
-  btn.innerHTML = '<span class="spinner"></span>Регистрирую…';
-  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Регистрирую…'; btn.disabled = true;
   try {
     const data = await api('/api/auth/register-client', 'POST', {
       username: document.getElementById('reg-username').value,
@@ -764,8 +659,7 @@ async function doRegister(e) {
     closeModal('login');
     toast('Аккаунт создан! Добро пожаловать!', 'success');
   } catch(err) {
-    errEl.textContent = err.message || 'Ошибка регистрации';
-    errEl.style.display = 'block';
+    errEl.textContent = err.message || 'Ошибка регистрации'; errEl.style.display = 'block';
   } finally { btn.innerHTML = 'Создать аккаунт'; btn.disabled = false; }
 }
 
@@ -786,18 +680,15 @@ function updateAuthUI() {
 }
 
 function logout() {
-  stopAllPolls();
   token = null; currentUser = null;
   localStorage.removeItem('clientToken');
   localStorage.removeItem('clientUser');
   document.getElementById('auth-buttons').style.display = 'flex';
   document.getElementById('user-panel').style.display = 'none';
-  document.getElementById('dashboard').style.display = 'none';
   toast('Вы вышли из системы', 'info');
 }
 
-// ── Book ──
-function openBookForDoctor(doctorId, doctorName) {
+function openBookForDoctor(doctorId) {
   if (!token) { openModal('login'); toast('Войдите, чтобы записаться', 'info'); return; }
   document.getElementById('book-doctor').value = doctorId;
   openModal('book');
@@ -817,11 +708,9 @@ async function doBook(e) {
     closeModal('book');
     document.getElementById('form-book').reset();
     toast('Запись создана! Мы свяжемся с вами для подтверждения.', 'success');
-    loadDashboardData();
   } catch(err) { errEl.textContent = err.message; errEl.style.display = 'block'; }
 }
 
-// ── Order ──
 function openOrderForService(serviceId, serviceName) {
   if (!token) { openModal('login'); toast('Войдите, чтобы заказать услугу', 'info'); return; }
   document.getElementById('order-service-id').value = serviceId;
@@ -841,274 +730,9 @@ async function doOrder(e) {
     closeModal('order');
     document.getElementById('form-order').reset();
     toast('Заказ оформлен! Мы свяжемся с вами.', 'success');
-    loadDashboardData();
   } catch(err) { errEl.textContent = err.message; errEl.style.display = 'block'; }
 }
 
-// ── Dashboard ──
-async function showDashboard() {
-  if (!token) { openModal('login'); return; }
-  document.getElementById('dashboard').style.display = 'block';
-  document.getElementById('dashboard').scrollIntoView({ behavior: 'smooth' });
-  document.getElementById('dashboard-welcome').textContent =
-    'Здравствуйте, ' + (currentUser.fullName || currentUser.username) + '!';
-  await loadDashboardData();
-}
-
-async function loadDashboardData() {
-  if (!token) return;
-  try {
-    const [appts, orders, docs, history] = await Promise.all([
-      api('/api/client/appointments/my'),
-      api('/api/client/service-orders/my'),
-      api('/api/medical/documents/my').catch(() => []),
-      api('/api/medical/history/my').catch(() => ({ notes:[], documents:[] })),
-    ]);
-    renderAppts(appts, 'all-appts');
-    renderAppts(appts.slice(0,3), 'recent-appts');
-    renderOrders(orders, 'all-orders');
-    renderOrders(orders.slice(0,3), 'recent-orders');
-    renderDocuments(docs || []);
-    renderHistory(history || { notes:[], documents:[] });
-    // Summary counters
-    document.getElementById('sum-appts').textContent = appts.length;
-    document.getElementById('sum-orders').textContent = orders.length;
-    document.getElementById('sum-docs').textContent = (docs||[]).length;
-    document.getElementById('sum-notes').textContent = (history?.notes||[]).length;
-    // Load doctor rooms for chat tab
-    loadDoctorChatRooms();
-  } catch(e) { console.error('Dashboard load:', e); }
-}
-
-function renderAppts(appts, containerId) {
-  const el = document.getElementById(containerId);
-  if (!appts || !appts.length) { el.innerHTML = '<div class="empty-state">Нет записей</div>'; return; }
-  el.innerHTML = appts.map(a => `
-    <div class="dash-item">
-      <div class="dash-item-title">${a.doctorName}</div>
-      <div class="dash-item-sub">${a.departmentName}${a.doctorSpecialty?` · ${sLabel(a.doctorSpecialty)}`:''}</div>
-      <div class="dash-item-sub">📅 ${fmtDate(a.preferredDate)}${a.preferredTime?` · ${a.preferredTime}`:''}</div>
-      <span class="status-badge status-${a.status}">${statusLabel(a.status)}</span>
-    </div>`).join('');
-}
-
-function renderOrders(orders, containerId) {
-  const el = document.getElementById(containerId);
-  if (!orders || !orders.length) { el.innerHTML = '<div class="empty-state">Нет заказов</div>'; return; }
-  el.innerHTML = orders.map(o => `
-    <div class="dash-item">
-      <div class="dash-item-title">${o.serviceName}</div>
-      <div class="dash-item-sub">💰 ${fmtPrice(o.servicePrice)} ₽</div>
-      <div class="dash-item-sub">📅 ${fmtDate(o.createdAt)}</div>
-      <span class="status-badge status-${o.status}">${statusLabel(o.status)}</span>
-    </div>`).join('');
-}
-
-function renderDocuments(docs) {
-  const el = document.getElementById('my-documents');
-  if (!docs.length) { el.innerHTML = '<div class="empty-state">Медицинских документов пока нет.<br>Они появятся после выдачи врачом.</div>'; return; }
-  el.innerHTML = docs.map(d => `
-    <div class="doc-card">
-      <div class="doc-header" onclick="toggleDoc(this)">
-        <span class="doc-type-badge doc-type-${d.type}">${d.typeLabel}</span>
-        <span class="doc-title">${d.title}</span>
-        <span class="doc-meta">${fmtDate(d.issuedAt)}</span>
-        <span style="color:var(--muted);font-size:.9rem">▼</span>
-      </div>
-      <div class="doc-body">
-        <div class="doc-content">${d.content}</div>
-        <div class="doc-footer">
-          <span>👨‍⚕️ ${d.doctorName}</span>
-          ${d.validUntil?`<span>⏳ Действует до: ${fmtDate(d.validUntil)}</span>`:''}
-          <span class="status-badge ${d.active?'status-CONFIRMED':'status-CANCELLED'}">${d.active?'Действует':'Аннулирован'}</span>
-        </div>
-      </div>
-    </div>`).join('');
-}
-
-function toggleDoc(header) {
-  const body = header.nextElementSibling;
-  body.classList.toggle('open');
-  header.querySelector('span:last-child').textContent = body.classList.contains('open') ? '▲' : '▼';
-}
-
-function renderHistory(history) {
-  const el = document.getElementById('my-history');
-  const notes = history.notes || [];
-  if (!notes.length) { el.innerHTML = '<div class="empty-state">История пуста. Записи появятся после визита к врачу.</div>'; return; }
-  el.innerHTML = notes.map(n => `
-    <div class="note-card note-type-${n.type}">
-      <div class="note-header">
-        <span class="note-type-badge note-${n.type}">${n.typeLabel}</span>
-        <span style="font-size:.78rem;color:var(--muted);margin-left:auto">${fmtDate(n.createdAt)}</span>
-      </div>
-      <div class="note-content">${n.content}</div>
-      <div class="note-footer">👨‍⚕️ ${n.doctorName}</div>
-    </div>`).join('');
-}
-
-// ── Tabs ──
-function showTab(tabId) {
-  document.querySelectorAll('.account-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.account-tab').forEach(t => t.classList.remove('active'));
-  document.getElementById(tabId)?.classList.add('active');
-  document.querySelectorAll('.account-tab').forEach(t => {
-    if (t.getAttribute('onclick')?.includes(tabId)) t.classList.add('active');
-  });
-}
-
-// ── SUPPORT CHAT ──
-async function openSupportChat() {
-  if (!token) { openModal('login'); return; }
-  const wrap = document.getElementById('support-chat-wrap');
-  wrap.innerHTML = '<div class="chat-loading"><span class="spinner" style="border-top-color:var(--blue);border-color:rgba(0,0,0,.1)"></span> Загружаем чат…</div>';
-  try {
-    const room = await api('/api/chat/support', 'POST');
-    supportRoomId = room.id;
-    const messages = await api(`/api/chat/rooms/${room.id}/messages`);
-    renderChatUI(wrap, 'support', 'Служба поддержки', messages);
-    if (messages.length > 0) supportLastId = messages[messages.length - 1].id;
-    startPoll('support');
-  } catch(e) {
-    wrap.innerHTML = '<div class="empty-state">Не удалось загрузить чат. Попробуйте позже.</div>';
-    console.error('Support chat:', e);
-  }
-}
-
-// ── DOCTOR CHAT ──
-async function loadDoctorChatRooms() {
-  if (!token) return;
-  const listEl = document.getElementById('doctor-chat-rooms');
-  try {
-    const rooms = await api('/api/chat/my-rooms');
-    const doctorRooms = (rooms || []).filter(r => r.type === 'DOCTOR_CLIENT');
-    if (!doctorRooms.length) {
-      listEl.innerHTML = '<p style="color:var(--muted);font-size:.875rem">Нет активных чатов с врачом. Чат открывается автоматически, когда ваш врач подключён к порталу.</p>';
-      return;
-    }
-    listEl.innerHTML = doctorRooms.map(r => `
-      <button class="doctor-room-btn" id="room-btn-${r.id}" onclick="openDoctorChat(${r.id},'${escHtml(r.staffUserName||'Врач')}')">
-        <div style="width:40px;height:40px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">
-          ${initials(r.staffUserName||'ВР')}
-        </div>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:.9rem">${r.staffUserName||'Врач'}</div>
-          ${r.lastMessage?`<div style="font-size:.78rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.lastMessage}</div>`:''}
-        </div>
-        ${r.unreadCount>0?`<span class="tab-badge">${r.unreadCount}</span>`:''}
-      </button>`).join('');
-  } catch(e) { console.error('Doctor rooms:', e); }
-}
-
-async function openDoctorChat(roomId, doctorName) {
-  document.querySelectorAll('.doctor-room-btn').forEach(b => b.classList.remove('active-room'));
-  document.getElementById('room-btn-' + roomId)?.classList.add('active-room');
-  const wrap = document.getElementById('doctor-chat-wrap');
-  wrap.innerHTML = '<div class="chat-loading"><span class="spinner" style="border-top-color:var(--blue);border-color:rgba(0,0,0,.1)"></span> Загружаем чат…</div>';
-  try {
-    const messages = await api(`/api/chat/rooms/${roomId}/messages`);
-    doctorRoomId = roomId;
-    renderChatUI(wrap, 'doctor', doctorName, messages);
-    if (messages.length > 0) doctorLastId = messages[messages.length - 1].id;
-    startPoll('doctor');
-  } catch(e) {
-    wrap.innerHTML = '<div class="empty-state">Не удалось загрузить чат.</div>';
-  }
-}
-
-// ── Generic chat UI builder ──
-function renderChatUI(container, chatType, title, messages) {
-  container.innerHTML = `
-    <div class="chat-wrap">
-      <div class="chat-toolbar">
-        <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>
-        <span class="chat-toolbar-title">${title}</span>
-        <span class="chat-status" id="chat-status-${chatType}">●  онлайн</span>
-      </div>
-      <div class="chat-messages" id="chat-msgs-${chatType}">
-        ${messages.length === 0 ? '<div style="text-align:center;color:var(--muted);padding:40px 0;font-size:.875rem">Начните диалог — напишите первое сообщение</div>' : messages.map(m => msgBubble(m)).join('')}
-      </div>
-      <div class="chat-input-bar">
-        <textarea class="chat-input" id="chat-input-${chatType}" placeholder="Напишите сообщение…" rows="1"
-          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat('${chatType}')}"
-          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
-        <button class="chat-send-btn" onclick="sendChat('${chatType}')">Отправить</button>
-      </div>
-    </div>`;
-  scrollChatToBottom(chatType);
-}
-
-function msgBubble(m) {
-  const mine = currentUser && m.senderName === (currentUser.fullName || currentUser.username);
-  const cls = mine ? 'mine' : 'other';
-  const time = m.sentAt ? new Date(m.sentAt).toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) : '';
-  return `<div class="chat-bubble ${cls}">
-    <div class="bubble-text">${escHtml2(m.content)}</div>
-    <div class="bubble-meta">${mine?'':`${m.senderName} · `}${time}</div>
-  </div>`;
-}
-
-function scrollChatToBottom(chatType) {
-  setTimeout(() => {
-    const el = document.getElementById('chat-msgs-' + chatType);
-    if (el) el.scrollTop = el.scrollHeight;
-  }, 50);
-}
-
-async function sendChat(chatType) {
-  const input = document.getElementById('chat-input-' + chatType);
-  const content = input.value.trim();
-  if (!content) return;
-  const roomId = chatType === 'support' ? supportRoomId : doctorRoomId;
-  if (!roomId) { toast('Чат ещё не загружен', 'error'); return; }
-  input.value = '';
-  input.style.height = 'auto';
-  try {
-    const msg = await api('/api/chat/rooms/' + roomId + '/messages', 'POST', { content });
-    appendMessage(msg, chatType);
-    if (chatType === 'support') supportLastId = msg.id;
-    else doctorLastId = msg.id;
-  } catch(e) { toast('Ошибка отправки: ' + e.message, 'error'); }
-}
-
-function appendMessage(m, chatType) {
-  const container = document.getElementById('chat-msgs-' + chatType);
-  if (!container) return;
-  const empty = container.querySelector('[style*="padding:40px"]');
-  if (empty) empty.remove();
-  container.insertAdjacentHTML('beforeend', msgBubble(m));
-  scrollChatToBottom(chatType);
-}
-
-// ── Polling ──
-function startPoll(chatType) {
-  stopPoll(chatType);
-  const timer = setInterval(async () => {
-    const roomId = chatType === 'support' ? supportRoomId : doctorRoomId;
-    const sinceId = chatType === 'support' ? supportLastId : doctorLastId;
-    if (!roomId) return;
-    try {
-      const msgs = await api(`/api/chat/rooms/${roomId}/messages/poll?sinceId=${sinceId}`);
-      if (msgs && msgs.length) {
-        msgs.forEach(m => appendMessage(m, chatType));
-        const lastId = msgs[msgs.length - 1].id;
-        if (chatType === 'support') supportLastId = lastId;
-        else doctorLastId = lastId;
-      }
-    } catch(e) { /* silent — don't flood toasts */ }
-  }, 3000);
-  if (chatType === 'support') supportPollTimer = timer;
-  else doctorPollTimer = timer;
-}
-
-function stopPoll(chatType) {
-  if (chatType === 'support' && supportPollTimer) { clearInterval(supportPollTimer); supportPollTimer = null; }
-  if (chatType === 'doctor' && doctorPollTimer)  { clearInterval(doctorPollTimer);  doctorPollTimer  = null; }
-}
-
-function stopAllPolls() { stopPoll('support'); stopPoll('doctor'); }
-
-// ── Modals ──
 function openModal(name) { document.getElementById('modal-' + name).classList.add('open'); }
 function closeModal(name) { document.getElementById('modal-' + name).classList.remove('open'); }
 
@@ -1119,7 +743,6 @@ function switchAuthTab(tab) {
   document.getElementById('tab-register').classList.toggle('active', tab === 'register');
 }
 
-// ── Toast ──
 function toast(message, type = 'info') {
   const el = document.createElement('div');
   el.className = 'toast toast-' + type;
@@ -1128,12 +751,8 @@ function toast(message, type = 'info') {
   setTimeout(() => el.remove(), 4000);
 }
 
-// ── Helpers ──
-function fmtPrice(n)   { return Number(n).toLocaleString('ru-RU'); }
-function fmtDate(s)    { return s ? new Date(s).toLocaleDateString('ru-RU') : '—'; }
-function escHtml(s)    { return String(s).replace(/'/g, "\\'"); }
-function escHtml2(s)   { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
-function statusLabel(s){ return {PENDING:'Ожидает',CONFIRMED:'Подтверждено',CANCELLED:'Отменено',COMPLETED:'Выполнено'}[s]||s; }
+function fmtPrice(n){ return Number(n).toLocaleString('ru-RU'); }
+function escHtml(s) { return String(s).replace(/'/g, "\\'"); }
 </script>
 </body>
 </html>

@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Кабинет врача — ГКБ №1</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#1d4ed8;--blue-light:#3b82f6;--blue-dark:#1e3a8a;--blue-50:#eff6ff;
+  --green:#059669;--green-light:#d1fae5;
+  --amber:#d97706;--amber-light:#fef3c7;
+  --red:#dc2626;--red-light:#fee2e2;
+  --purple:#7c3aed;--purple-light:#ede9fe;
+  --teal:#0891b2;
+  --bg:#f1f5f9;--surface:#ffffff;--text:#0f172a;--muted:#64748b;
+  --border:#e2e8f0;
+  --shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:0 4px 6px rgba(0,0,0,.07),0 2px 4px rgba(0,0,0,.06);
+  --shadow-lg:0 10px 15px rgba(0,0,0,.1),0 4px 6px rgba(0,0,0,.05);
+  --radius:12px;--radius-sm:8px;
+  --sidebar-w:220px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+button{cursor:pointer;border:none;background:none}
+input,select,textarea{font-family:inherit}
+a{text-decoration:none;color:inherit}
+
+/* ── App shell ── */
+.app{display:flex;height:100vh;overflow:hidden}
+
+/* ── Sidebar ── */
+.sidebar{width:var(--sidebar-w);background:var(--blue-dark);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-logo{padding:18px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.1)}
+.sidebar-logo svg{flex-shrink:0}
+.logo-text{color:#fff;font-weight:700;font-size:.9rem}
+.logo-sub{color:rgba(255,255,255,.45);font-size:.68rem}
+.sidebar-doctor{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.1)}
+.dr-avatar{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;color:#fff;flex-shrink:0;margin-bottom:8px}
+.dr-name{color:#fff;font-size:.82rem;font-weight:600;line-height:1.3}
+.dr-spec{color:rgba(255,255,255,.55);font-size:.7rem;margin-top:2px}
+.dr-dept{color:rgba(255,255,255,.45);font-size:.68rem;margin-top:2px}
+.sidebar-nav{flex:1;padding:6px 0;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;color:rgba(255,255,255,.6);font-size:.82rem;cursor:pointer;border-left:3px solid transparent;transition:all .15s;width:100%;text-align:left}
+.nav-item:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav-item.active{background:rgba(255,255,255,.1);color:#fff;border-left-color:var(--blue-light)}
+.nav-icon{font-size:.95rem;width:18px;text-align:center;flex-shrink:0}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:.6rem;font-weight:700;border-radius:10px;min-width:16px;height:16px;padding:0 4px;display:inline-flex;align-items:center;justify-content:center}
+.sidebar-footer{padding:10px 14px;border-top:1px solid rgba(255,255,255,.1)}
+.btn-logout{width:100%;padding:7px 10px;border-radius:var(--radius-sm);background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);font-size:.75rem;display:flex;align-items:center;gap:7px;transition:all .15s}
+.btn-logout:hover{background:rgba(255,255,255,.12);color:#fff}
+
+/* ── Main area ── */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.topbar-title{font-size:1.05rem;font-weight:600;flex:1}
+.btn-refresh{padding:6px 12px;border-radius:var(--radius-sm);font-size:.78rem;background:var(--bg);color:var(--muted);border:1.5px solid var(--border);transition:all .15s}
+.btn-refresh:hover{color:var(--blue);border-color:var(--blue)}
+.content{flex:1;overflow-y:auto;padding:24px}
+
+/* ── Pages ── */
+.page{display:none}.page.active{display:block}
+
+/* ── Stat cards ── */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
+.stat-icon{font-size:1.5rem;margin-bottom:6px}
+.stat-num{font-size:1.6rem;font-weight:800;color:var(--blue)}
+.stat-label{font-size:.75rem;color:var(--muted);margin-top:2px}
+
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.card-title{font-weight:600;font-size:.9rem}
+.card-body{padding:16px 18px}
+
+/* ── Patient list ── */
+.patients-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.patient-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:box-shadow .15s,border-color .15s;position:relative}
+.patient-card:hover{box-shadow:var(--shadow-md);border-color:var(--blue-light)}
+.patient-card.selected{border-color:var(--blue);background:var(--blue-50)}
+.patient-initials{width:44px;height:44px;border-radius:50%;background:var(--blue);color:#fff;font-weight:700;font-size:1.1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.patient-name{font-weight:600;font-size:.9rem;margin-bottom:3px}
+.patient-meta{font-size:.77rem;color:var(--muted)}
+.patient-actions{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:var(--radius-sm);font-size:.78rem;font-weight:500;transition:all .15s;cursor:pointer;border:none}
+.btn-primary{background:var(--blue);color:#fff}.btn-primary:hover{background:var(--blue-dark)}
+.btn-outline{background:transparent;color:var(--blue);border:1.5px solid var(--blue)}.btn-outline:hover{background:var(--blue);color:#fff}
+.btn-ghost{background:var(--bg);color:var(--muted);border:1.5px solid var(--border)}.btn-ghost:hover{color:var(--text);border-color:var(--text)}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:#047857}
+.btn-sm{padding:5px 10px;font-size:.74rem}
+.btn-danger{background:var(--red-light);color:var(--red);border:1.5px solid #fecaca}.btn-danger:hover{background:var(--red);color:#fff}
+
+/* ── Status badges ── */
+.badge{display:inline-block;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:20px}
+.badge-TREATMENT{background:#dbeafe;color:#1e40af}
+.badge-DISCHARGED{background:#d1fae5;color:#065f46}
+.badge-TRANSFERRED{background:#ede9fe;color:#5b21b6}
+
+/* ── Detail panel (right side) ── */
+.detail-panel{position:fixed;top:0;right:0;width:480px;height:100vh;background:var(--surface);border-left:1px solid var(--border);box-shadow:var(--shadow-lg);transform:translateX(100%);transition:transform .25s ease;z-index:50;display:flex;flex-direction:column}
+.detail-panel.open{transform:translateX(0)}
+.panel-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.panel-close{width:30px;height:30px;border-radius:6px;background:var(--bg);color:var(--muted);font-size:1rem;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;flex-shrink:0}
+.panel-close:hover{background:var(--border)}
+.panel-patient-info{flex:1;min-width:0}
+.panel-patient-name{font-weight:700;font-size:1rem}
+.panel-patient-sub{font-size:.78rem;color:var(--muted);margin-top:2px}
+.panel-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.panel-tab{flex:1;padding:10px 8px;font-size:.78rem;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;text-align:center;background:none;border-top:none;border-left:none;border-right:none}
+.panel-tab:hover{color:var(--text)}
+.panel-tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.panel-body{flex:1;overflow-y:auto;padding:16px 20px}
+
+/* ── History in panel ── */
+.hist-section-title{font-size:.82rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 8px}
+.hist-section-title:first-child{margin-top:0}
+.note-card{background:var(--surface);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:8px;border:1px solid var(--border);border-left-width:3px}
+.note-card.nt-DIAGNOSIS{border-left-color:var(--red)}
+.note-card.nt-OBSERVATION{border-left-color:var(--green)}
+.note-card.nt-NOTE{border-left-color:var(--blue-light)}
+.note-type-badge{font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:20px}
+.nbg-DIAGNOSIS{background:var(--red-light);color:#991b1b}
+.nbg-OBSERVATION{background:var(--green-light);color:#065f46}
+.nbg-NOTE{background:#dbeafe;color:#1e40af}
+.note-content{font-size:.85rem;line-height:1.55;margin-top:6px;color:var(--text)}
+.note-meta{font-size:.7rem;color:var(--muted);margin-top:4px;display:flex;gap:12px;flex-wrap:wrap}
+.doc-mini{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px}
+.doc-mini-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.doc-mini-type{font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:20px}
+.doc-type-PRESCRIPTION{background:#fef3c7;color:#92400e}
+.doc-type-REFERRAL{background:#e0e7ff;color:#3730a3}
+.doc-type-SICK_LEAVE{background:var(--red-light);color:#991b1b}
+.doc-type-ANALYSIS_ORDER{background:var(--green-light);color:#065f46}
+.doc-type-CERTIFICATE{background:#dbeafe;color:#1e40af}
+.doc-mini-title{font-weight:600;font-size:.82rem;flex:1}
+.doc-mini-content{font-size:.78rem;line-height:1.5;color:var(--muted);max-height:60px;overflow:hidden}
+
+/* ── Forms in panel ── */
+.form-group{margin-bottom:12px}
+.form-label{display:block;font-size:.78rem;font-weight:600;margin-bottom:4px;color:var(--muted)}
+.form-control{width:100%;padding:8px 11px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:.85rem;background:var(--surface);transition:border-color .15s}
+.form-control:focus{outline:none;border-color:var(--blue-light);box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+textarea.form-control{resize:vertical;min-height:80px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-submit{width:100%;padding:10px;border-radius:var(--radius-sm);font-size:.875rem;font-weight:600;background:var(--blue);color:#fff;transition:background .15s;border:none;cursor:pointer;margin-top:4px}
+.form-submit:hover{background:var(--blue-dark)}
+.form-hint{font-size:.72rem;color:var(--muted);margin-top:3px}
+.checkbox-row{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.checkbox-row input{width:16px;height:16px;cursor:pointer;accent-color:var(--blue)}
+.checkbox-row label{font-size:.82rem;color:var(--text);cursor:pointer}
+
+/* ── Chat in main content ── */
+.chat-layout{display:grid;grid-template-columns:260px 1fr;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface);height:calc(100vh - 180px)}
+.chat-rooms-col{border-right:1px solid var(--border);display:flex;flex-direction:column}
+.chat-rooms-head{padding:12px 14px;font-weight:600;font-size:.82rem;background:var(--bg);border-bottom:1px solid var(--border);color:var(--muted)}
+.chat-rooms-list{flex:1;overflow-y:auto;padding:6px}
+.chat-room-item{padding:9px 10px;border-radius:var(--radius-sm);cursor:pointer;border:1px solid transparent;transition:all .12s;margin-bottom:3px;display:flex;align-items:center;gap:9px}
+.chat-room-item:hover{background:var(--bg)}
+.chat-room-item.active{background:var(--blue-50);border-color:#bfdbfe}
+.room-avatar{width:34px;height:34px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.75rem;flex-shrink:0}
+.room-name{font-weight:600;font-size:.8rem}
+.room-preview{font-size:.7rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+.chat-main-col{display:flex;flex-direction:column}
+.chat-toolbar{padding:11px 16px;background:var(--blue-dark);color:#fff;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.chat-toolbar-title{font-weight:600;font-size:.88rem;flex:1}
+.chat-messages{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:7px;background:#f8fafc}
+.bubble{max-width:70%}
+.bubble.mine{align-self:flex-end}
+.bubble.other{align-self:flex-start}
+.bubble-text{padding:8px 12px;border-radius:14px;font-size:.85rem;line-height:1.45;word-wrap:break-word}
+.mine .bubble-text{background:var(--blue);color:#fff;border-bottom-right-radius:3px}
+.other .bubble-text{background:var(--surface);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:3px}
+.bubble-meta{font-size:.66rem;color:var(--muted);margin-top:2px}
+.mine .bubble-meta{text-align:right}
+.chat-input-bar{padding:9px 12px;border-top:1px solid var(--border);display:flex;gap:7px;background:var(--surface);flex-shrink:0}
+.chat-input{flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:16px;font-size:.85rem;background:var(--bg);resize:none;transition:border-color .15s}
+.chat-input:focus{outline:none;border-color:var(--blue-light);background:var(--surface)}
+.chat-send{padding:8px 16px;background:var(--blue);color:#fff;border-radius:16px;font-size:.78rem;font-weight:600;transition:background .15s}
+.chat-send:hover{background:var(--blue-dark)}
+.chat-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:6px;color:var(--muted);font-size:.8rem}
+.chat-placeholder-icon{font-size:2rem;opacity:.25}
+
+/* ── Search bar ── */
+.search-bar{display:flex;gap:8px;margin-bottom:16px;align-items:center}
+.search-input{flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:.875rem;background:var(--surface);transition:border-color .15s}
+.search-input:focus{outline:none;border-color:var(--blue-light)}
+.filter-select{padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:.82rem;background:var(--surface);color:var(--text);cursor:pointer}
+
+/* ── Empty states ── */
+.empty{text-align:center;padding:40px 16px;color:var(--muted);font-size:.875rem}
+.empty-icon{font-size:2.2rem;margin-bottom:10px;opacity:.35}
+
+/* ── Misc ── */
+.spinner{width:15px;height:15px;border:2px solid rgba(0,0,0,.1);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:5px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.flex-between{display:flex;align-items:center;justify-content:space-between}
+.gap-8{gap:8px}
+
+/* ── Toast ── */
+.toast-container{position:fixed;bottom:20px;right:20px;z-index:999;display:flex;flex-direction:column;gap:6px}
+.toast{padding:11px 16px;border-radius:var(--radius-sm);font-size:.82rem;font-weight:500;color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.2);animation:slideIn .2s ease;max-width:300px}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.toast-success{background:#059669}.toast-error{background:#dc2626}.toast-info{background:#1d4ed8}.toast-warning{background:#d97706}
+
+/* ── Responsive ── */
+@media(max-width:900px){
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+  .detail-panel{width:100%}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ════ SIDEBAR ════ -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <svg width="26" height="26" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="7" fill="#3b82f6"/><path d="M16 8v16M8 16h16" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>
+      <div><div class="logo-text">ГКБ №1</div><div class="logo-sub">Портал врача</div></div>
+    </div>
+    <div class="sidebar-doctor">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="dr-avatar" id="dr-avatar" style="background:var(--blue)">?</div>
+        <div>
+          <div class="dr-name" id="dr-name">Загрузка…</div>
+          <div class="dr-spec" id="dr-spec"></div>
+          <div class="dr-dept" id="dr-dept"></div>
+        </div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" onclick="navigate('dashboard')" data-page="dashboard">
+        <span class="nav-icon">◼</span> Дашборд
+      </button>
+      <button class="nav-item" onclick="navigate('patients')" data-page="patients">
+        <span class="nav-icon">👥</span> Мои пациенты
+      </button>
+      <button class="nav-item" onclick="navigate('chats')" data-page="chats">
+        <span class="nav-icon">💬</span> Чаты с пациентами
+        <span class="nav-badge" id="badge-chats" style="display:none">0</span>
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="btn-logout" onclick="logout()">
+        <svg width="13" height="13" fill="none" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Выйти
+      </button>
+    </div>
+  </aside>
+
+  <!-- ════ MAIN ════ -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">Дашборд</div>
+      <button class="btn-refresh" onclick="reloadPage()">↻ Обновить</button>
+    </div>
+    <div class="content">
+
+      <!-- ════ DASHBOARD ════ -->
+      <div class="page active" id="page-dashboard">
+        <div class="stats-row">
+          <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-num" id="ds-patients">—</div><div class="stat-label">Пациентов на лечении</div></div>
+          <div class="stat-card"><div class="stat-icon">💬</div><div class="stat-num" id="ds-chats">—</div><div class="stat-label">Активных чатов</div></div>
+          <div class="stat-card"><div class="stat-icon">📄</div><div class="stat-num" id="ds-docs">—</div><div class="stat-label">Документов выдано</div></div>
+          <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-num" id="ds-notes">—</div><div class="stat-label">Заметок добавлено</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Последние пациенты</span>
+              <button class="btn btn-sm btn-ghost" onclick="navigate('patients')">Все →</button>
+            </div>
+            <div class="card-body" id="ds-recent-patients">
+              <div class="empty"><span class="spinner"></span></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Последние чаты</span>
+              <button class="btn btn-sm btn-ghost" onclick="navigate('chats')">Все →</button>
+            </div>
+            <div class="card-body" id="ds-recent-chats">
+              <div class="empty"><span class="spinner"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════ PATIENTS ════ -->
+      <div class="page" id="page-patients">
+        <div class="search-bar">
+          <input class="search-input" id="patient-search" placeholder="Поиск по имени…" oninput="filterPatients()">
+          <select class="filter-select" id="patient-status-filter" onchange="filterPatients()">
+            <option value="">Все статусы</option>
+            <option value="TREATMENT">На лечении</option>
+            <option value="DISCHARGED">Выписан</option>
+            <option value="TRANSFERRED">Переведён</option>
+          </select>
+        </div>
+        <div class="patients-grid" id="patients-grid">
+          <div class="empty"><span class="spinner"></span> Загрузка…</div>
+        </div>
+        <div id="patients-pagination" style="display:flex;justify-content:center;gap:6px;margin-top:20px"></div>
+      </div>
+
+      <!-- ════ CHATS ════ -->
+      <div class="page" id="page-chats">
+        <div class="chat-layout">
+          <div class="chat-rooms-col">
+            <div class="chat-rooms-head">Чаты с пациентами</div>
+            <div class="chat-rooms-list" id="chat-rooms-list">
+              <div class="empty"><span class="spinner"></span></div>
+            </div>
+          </div>
+          <div class="chat-main-col" id="chat-main">
+            <div class="chat-placeholder">
+              <div class="chat-placeholder-icon">💬</div>
+              <div>Выберите чат из списка</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ════ PATIENT DETAIL PANEL ════ -->
+<div class="detail-panel" id="detail-panel">
+  <div class="panel-header">
+    <div class="patient-initials" id="panel-avatar" style="width:40px;height:40px;border-radius:50%;background:var(--blue);color:#fff;font-weight:700;font-size:1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0">?</div>
+    <div class="panel-patient-info">
+      <div class="panel-patient-name" id="panel-patient-name">Пациент</div>
+      <div class="panel-patient-sub" id="panel-patient-sub"></div>
+    </div>
+    <button class="panel-close" onclick="closePanel()">✕</button>
+  </div>
+  <div class="panel-tabs">
+    <button class="panel-tab active" onclick="switchPanelTab('history')" id="ptab-history">История</button>
+    <button class="panel-tab" onclick="switchPanelTab('note')"    id="ptab-note">+ Заметка</button>
+    <button class="panel-tab" onclick="switchPanelTab('doc')"     id="ptab-doc">+ Документ</button>
+    <button class="panel-tab" onclick="switchPanelTab('chat')"    id="ptab-chat">Чат</button>
+  </div>
+  <div class="panel-body" id="panel-body">
+    <div class="empty"><span class="spinner"></span> Загрузка…</div>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+
+<script>
+const API = 'http://localhost:8090';
+let token = localStorage.getItem('token');
+let myUser = null;
+let myDoctor = null;
+let currentPage = 'dashboard';
+let allPatients = [];
+let activePanelPatientId = null;
+let activePanelTab = 'history';
+let chatRoomId = null, chatLastId = 0, chatTimer = null;
+
+// ── Guard ──
+if (!token) { window.location.href = '/login.html'; }
+
+window.addEventListener('DOMContentLoaded', init);
+
+async function init() {
+  try {
+    myDoctor = await api('/api/doctors/me');
+    renderDoctorProfile();
+    loadDashboard();
+  } catch(e) {
+    toast('Ваш аккаунт не привязан к записи врача. Обратитесь к администратору.', 'error');
+  }
+}
+
+function renderDoctorProfile() {
+  if (!myDoctor) return;
+  document.getElementById('dr-name').textContent = myDoctor.fullName || '';
+  document.getElementById('dr-spec').textContent = sLabel(myDoctor.specialty);
+  document.getElementById('dr-dept').textContent = myDoctor.departmentName || '';
+  const parts = (myDoctor.fullName || '').split(' ');
+  const av = document.getElementById('dr-avatar');
+  av.textContent = parts.length >= 2 ? parts[0][0] + parts[1][0] : '??';
+  av.style.background = sColor(myDoctor.specialty);
+  document.title = 'Кабинет — ' + myDoctor.fullName;
+}
+
+// ── API ──
+async function api(path, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API + path, opts);
+  if (res.status === 401) { logout(); return; }
+  if (res.status === 204) return null;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || data.error || 'Ошибка ' + res.status);
+  return data;
+}
+
+// ── Navigation ──
+const pageTitles = { dashboard:'Дашборд', patients:'Мои пациенты', chats:'Чаты с пациентами' };
+
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + page)?.classList.add('active');
+  document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
+  document.getElementById('topbar-title').textContent = pageTitles[page] || page;
+  currentPage = page;
+  stopChatPoll();
+  if (page === 'dashboard') loadDashboard();
+  if (page === 'patients')  loadPatients();
+  if (page === 'chats')     loadChats();
+}
+
+function reloadPage() { navigate(currentPage); }
+
+// ── Dashboard ──
+async function loadDashboard() {
+  if (!myDoctor) return;
+  try {
+    const [patientsPage, chatRooms] = await Promise.all([
+      api(`/api/doctors/${myDoctor.id}/patients?size=100`),
+      api('/api/chat/doctor/rooms'),
+    ]);
+    const pts = patientsPage?.content || [];
+    const activePts = pts.filter(p => p.status === 'TREATMENT');
+    document.getElementById('ds-patients').textContent = activePts.length;
+    document.getElementById('ds-chats').textContent    = (chatRooms||[]).length;
+    // docs and notes will stay — as aggregated stats we can't easily get them without fetching all
+    document.getElementById('ds-docs').textContent  = '—';
+    document.getElementById('ds-notes').textContent = '—';
+    renderRecentPatients(pts.slice(0,5));
+    renderRecentChats((chatRooms||[]).slice(0,5));
+  } catch(e) { console.error(e); }
+}
+
+function renderRecentPatients(pts) {
+  const el = document.getElementById('ds-recent-patients');
+  if (!pts.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">👥</div>Нет пациентов</div>'; return; }
+  el.innerHTML = pts.map(p => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="openPatient(${p.id},'${escQ(p.fullName)}')">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;font-weight:700;font-size:.75rem;display:flex;align-items:center;justify-content:center;flex-shrink:0">${initials(p.fullName)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:.82rem">${esc(p.fullName)}</div>
+        <div style="font-size:.72rem;color:var(--muted)">${esc(p.currentWardNumber||'Палата не назначена')}</div>
+      </div>
+      <span class="badge badge-${p.status}">${statusLabel(p.status)}</span>
+    </div>`).join('');
+}
+
+function renderRecentChats(rooms) {
+  const el = document.getElementById('ds-recent-chats');
+  if (!rooms.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">💬</div>Нет чатов</div>'; return; }
+  el.innerHTML = rooms.map(r => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="navigate('chats');setTimeout(()=>openChatRoom(${r.id},'${escQ(r.clientUserName||'Пациент')}'),200)">
+      <div class="room-avatar">${initials(r.clientUserName||'П')}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:.82rem">${esc(r.clientUserName||'Пациент')}</div>
+        <div style="font-size:.72rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.lastMessage?esc(r.lastMessage):'Нет сообщений'}</div>
+      </div>
+      ${r.unreadCount>0?`<span style="background:var(--red);color:#fff;font-size:.6rem;font-weight:700;border-radius:10px;padding:1px 6px">${r.unreadCount}</span>`:''}
+    </div>`).join('');
+}
+
+// ── Patients ──
+let pPage = 0, pTotal = 0;
+
+async function loadPatients(page = 0) {
+  if (!myDoctor) return;
+  pPage = page;
+  const grid = document.getElementById('patients-grid');
+  grid.innerHTML = '<div class="empty"><span class="spinner"></span> Загрузка…</div>';
+  try {
+    const data = await api(`/api/doctors/${myDoctor.id}/patients?page=${page}&size=20`);
+    allPatients = data.content || [];
+    pTotal = data.totalPages || 1;
+    renderPatients(allPatients);
+    buildPagination(data);
+  } catch(e) { grid.innerHTML = '<div class="empty">Ошибка загрузки</div>'; }
+}
+
+function filterPatients() {
+  const q = document.getElementById('patient-search')?.value?.trim().toLowerCase() || '';
+  const st = document.getElementById('patient-status-filter')?.value || '';
+  const filtered = allPatients.filter(p => {
+    const matchQ  = !q  || p.fullName.toLowerCase().includes(q);
+    const matchSt = !st || p.status === st;
+    return matchQ && matchSt;
+  });
+  renderPatients(filtered);
+}
+
+function renderPatients(pts) {
+  const grid = document.getElementById('patients-grid');
+  if (!pts.length) { grid.innerHTML = '<div class="empty"><div class="empty-icon">👥</div>Пациентов не найдено</div>'; return; }
+  grid.innerHTML = pts.map(p => `
+    <div class="patient-card ${activePanelPatientId === p.id ? 'selected':''}" onclick="openPatient(${p.id},'${escQ(p.fullName)}')">
+      <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:10px">
+        <div class="patient-initials">${initials(p.fullName)}</div>
+        <div style="flex:1">
+          <div class="patient-name">${esc(p.fullName)}</div>
+          <div class="patient-meta">${p.birthDate?'Д.р.: '+fmtDate(p.birthDate)+' &nbsp;':''} ${p.snils?'СНИЛС: '+esc(p.snils):''}</div>
+          <div class="patient-meta" style="margin-top:2px">${p.currentWardNumber?'Палата: '+esc(p.currentWardNumber):'Палата не назначена'}</div>
+        </div>
+        <span class="badge badge-${p.status}">${statusLabel(p.status)}</span>
+      </div>
+      <div class="patient-actions">
+        <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();openPatient(${p.id},'${escQ(p.fullName)}')">История</button>
+        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openPatientAndTab(${p.id},'${escQ(p.fullName)}','note')">+ Заметка</button>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openPatientAndTab(${p.id},'${escQ(p.fullName)}','doc')">+ Документ</button>
+      </div>
+    </div>`).join('');
+}
+
+function buildPagination(data) {
+  const el = document.getElementById('patients-pagination');
+  if (data.totalPages <= 1) { el.innerHTML = ''; return; }
+  let html = `<button style="padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:pointer" ${data.page===0?'disabled':''} onclick="loadPatients(${data.page-1})">‹</button>`;
+  for (let i = 0; i < data.totalPages; i++) {
+    html += `<button style="padding:5px 10px;border-radius:6px;border:1px solid ${i===data.page?'var(--blue)':'var(--border)'};background:${i===data.page?'var(--blue)':'var(--surface)'};color:${i===data.page?'#fff':'inherit'};cursor:pointer" onclick="loadPatients(${i})">${i+1}</button>`;
+  }
+  html += `<button style="padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:pointer" ${data.last?'disabled':''} onclick="loadPatients(${data.page+1})">›</button>`;
+  el.innerHTML = html;
+}
+
+// ── Patient Detail Panel ──
+function openPatient(patientId, patientName) {
+  activePanelPatientId = patientId;
+  document.getElementById('panel-patient-name').textContent = patientName;
+  document.getElementById('panel-avatar').textContent = initials(patientName);
+  document.getElementById('detail-panel').classList.add('open');
+  switchPanelTab('history');
+  // refresh patient card highlight
+  document.querySelectorAll('.patient-card').forEach(c => c.classList.remove('selected'));
+  const found = document.querySelectorAll('.patient-card');
+  found.forEach(c => { if (c.querySelector('.patient-name')?.textContent === patientName) c.classList.add('selected'); });
+}
+
+function openPatientAndTab(patientId, patientName, tab) {
+  openPatient(patientId, patientName);
+  setTimeout(() => switchPanelTab(tab), 0);
+}
+
+function closePanel() {
+  document.getElementById('detail-panel').classList.remove('open');
+  activePanelPatientId = null;
+  document.querySelectorAll('.patient-card').forEach(c => c.classList.remove('selected'));
+}
+
+function switchPanelTab(tab) {
+  activePanelTab = tab;
+  document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('ptab-' + tab)?.classList.add('active');
+  const body = document.getElementById('panel-body');
+  if (tab === 'history') loadPanelHistory(body);
+  if (tab === 'note')    renderNoteForm(body);
+  if (tab === 'doc')     renderDocForm(body);
+  if (tab === 'chat')    loadPanelChat(body);
+}
+
+async function loadPanelHistory(body) {
+  if (!activePanelPatientId) return;
+  body.innerHTML = '<div class="empty"><span class="spinner"></span> Загрузка…</div>';
+  try {
+    const hist = await api(`/api/medical/history/patient/${activePanelPatientId}`);
+    document.getElementById('panel-patient-sub').textContent = hist.patientName || '';
+    const notes = hist.notes || [];
+    const docs  = hist.documents || [];
+    if (!notes.length && !docs.length) {
+      body.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>История пуста</div>';
+      return;
+    }
+    let html = '';
+    if (notes.length) {
+      html += `<div class="hist-section-title">Заметки (${notes.length})</div>`;
+      html += notes.map(n => `
+        <div class="note-card nt-${n.type}">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <span class="note-type-badge nbg-${n.type}">${esc(n.typeLabel)}</span>
+            <span style="font-size:.68rem;color:var(--muted)">${fmtDate(n.createdAt)}</span>
+          </div>
+          <div class="note-content">${esc2(n.content)}</div>
+          <div class="note-meta">
+            <span>👨‍⚕️ ${esc(n.doctorName)}</span>
+            ${!n.visibleToClient?`<span style="color:var(--muted)">🔒 Скрыто от пациента</span>`:
+              `<span style="color:var(--green)">✓ Видно пациенту</span>`}
+          </div>
+        </div>`).join('');
+    }
+    if (docs.length) {
+      html += `<div class="hist-section-title">Документы (${docs.length})</div>`;
+      html += docs.map(d => `
+        <div class="doc-mini">
+          <div class="doc-mini-header">
+            <span class="doc-mini-type doc-type-${d.type}">${esc(d.typeLabel)}</span>
+            <span class="doc-mini-title">${esc(d.title)}</span>
+            <span style="font-size:.68rem;color:var(--muted);white-space:nowrap">${fmtDate(d.issuedAt)}</span>
+          </div>
+          <div class="doc-mini-content">${esc(d.content)}</div>
+          <div style="font-size:.7rem;color:var(--muted);margin-top:6px">
+            👨‍⚕️ ${esc(d.doctorName)}
+            ${d.validUntil?` &nbsp;⏳ до ${fmtDate(d.validUntil)}`:''}
+            ${!d.active?` &nbsp;<span style="color:var(--red)">Аннулирован</span>`:''}
+          </div>
+        </div>`).join('');
+    }
+    body.innerHTML = html;
+  } catch(e) { body.innerHTML = '<div class="empty">Ошибка загрузки истории</div>'; }
+}
+
+function renderNoteForm(body) {
+  body.innerHTML = `
+    <h3 style="font-size:.9rem;font-weight:600;margin-bottom:14px">Добавить заметку врача</h3>
+    <div class="form-group">
+      <label class="form-label">Тип заметки</label>
+      <select class="form-control" id="note-type">
+        <option value="NOTE">Заметка</option>
+        <option value="DIAGNOSIS">Диагноз</option>
+        <option value="OBSERVATION">Наблюдение / осмотр</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Содержание</label>
+      <textarea class="form-control" id="note-content" rows="5" placeholder="Опишите наблюдение, диагноз или заметку…"></textarea>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="note-visible">
+      <label for="note-visible">Показать пациенту в личном кабинете</label>
+    </div>
+    <button class="form-submit" onclick="saveNote()">Сохранить заметку</button>`;
+}
+
+async function saveNote() {
+  const content = document.getElementById('note-content')?.value?.trim();
+  if (!content) { toast('Заполните содержание заметки', 'warning'); return; }
+  try {
+    await api('/api/medical/notes', 'POST', {
+      patientId: activePanelPatientId,
+      type: document.getElementById('note-type').value,
+      content,
+      visibleToClient: document.getElementById('note-visible').checked,
+    });
+    toast('Заметка добавлена', 'success');
+    switchPanelTab('history');
+  } catch(e) { toast(e.message || 'Ошибка', 'error'); }
+}
+
+function renderDocForm(body) {
+  body.innerHTML = `
+    <h3 style="font-size:.9rem;font-weight:600;margin-bottom:14px">Выдать медицинский документ</h3>
+    <div class="form-group">
+      <label class="form-label">Тип документа</label>
+      <select class="form-control" id="doc-type">
+        <option value="PRESCRIPTION">Рецепт</option>
+        <option value="REFERRAL">Направление к специалисту</option>
+        <option value="SICK_LEAVE">Больничный лист</option>
+        <option value="ANALYSIS_ORDER">Направление на анализы</option>
+        <option value="CERTIFICATE">Справка</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Название документа</label>
+      <input class="form-control" id="doc-title" placeholder="Например: Рецепт на амоксициллин">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Содержание</label>
+      <textarea class="form-control" id="doc-content" rows="5" placeholder="Детали назначения, дозировка, инструкции…"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Действителен до (необязательно)</label>
+      <input class="form-control" type="date" id="doc-valid-until">
+      <div class="form-hint">Для рецептов обычно 30 дней, для больничных — указать последний день</div>
+    </div>
+    <button class="form-submit" onclick="saveDoc()">Выдать документ</button>`;
+}
+
+async function saveDoc() {
+  const title   = document.getElementById('doc-title')?.value?.trim();
+  const content = document.getElementById('doc-content')?.value?.trim();
+  if (!title || !content) { toast('Заполните название и содержание', 'warning'); return; }
+  try {
+    await api('/api/medical/documents', 'POST', {
+      patientId:  activePanelPatientId,
+      type:       document.getElementById('doc-type').value,
+      title, content,
+      validUntil: document.getElementById('doc-valid-until').value || null,
+    });
+    toast('Документ создан', 'success');
+    switchPanelTab('history');
+  } catch(e) { toast(e.message || 'Ошибка', 'error'); }
+}
+
+async function loadPanelChat(body) {
+  if (!activePanelPatientId) return;
+  // need the patient's userId — we get it from patient data
+  body.innerHTML = '<div class="empty"><span class="spinner"></span> Загрузка чата…</div>';
+  try {
+    // find the patient's clientUserId from their record
+    const patient = await api(`/api/patients/${activePanelPatientId}`);
+    if (!patient.clientUserId) {
+      body.innerHTML = '<div class="empty"><div class="empty-icon">💬</div>Пациент не зарегистрирован на портале.<br><small style="font-size:.75rem">Чат доступен только с пациентами, у которых есть аккаунт.</small></div>';
+      return;
+    }
+    // get or create the doctor-client chat room
+    const room = await api(`/api/chat/doctor/${patient.clientUserId}`, 'POST');
+    const msgs = await api(`/api/chat/rooms/${room.id}/messages`);
+    chatRoomId = room.id;
+    chatLastId = msgs.length ? msgs[msgs.length-1].id : 0;
+    body.innerHTML = `
+      <div style="display:flex;flex-direction:column;height:100%">
+        <div id="panel-chat-msgs" style="flex:1;overflow-y:auto;padding:4px 0;display:flex;flex-direction:column;gap:6px;min-height:200px;max-height:320px">
+          ${msgs.length ? msgs.map(m => panelMsgBubble(m)).join('') : '<div class="empty" style="padding:20px">Начните диалог</div>'}
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:8px;display:flex;gap:6px">
+          <textarea id="panel-chat-input" class="form-control" rows="2" placeholder="Сообщение пациенту…"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendPanelMsg()}"
+            style="resize:none"></textarea>
+          <button class="btn btn-primary btn-sm" onclick="sendPanelMsg()" style="align-self:flex-end">→</button>
+        </div>
+      </div>`;
+    const area = document.getElementById('panel-chat-msgs');
+    if (area) area.scrollTop = area.scrollHeight;
+    startChatPoll();
+  } catch(e) {
+    body.innerHTML = '<div class="empty">Ошибка загрузки чата</div>';
+    console.error(e);
+  }
+}
+
+function panelMsgBubble(m) {
+  const myName = localStorage.getItem('fullName') || '';
+  const mine = m.senderName === myName;
+  const time = m.sentAt ? new Date(m.sentAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}) : '';
+  return `<div class="bubble ${mine?'mine':'other'}">
+    <div class="bubble-text" style="font-size:.82rem">${esc2(m.content)}</div>
+    <div class="bubble-meta">${mine?'':esc(m.senderName)+' · '}${time}</div>
+  </div>`;
+}
+
+async function sendPanelMsg() {
+  const input = document.getElementById('panel-chat-input');
+  const content = input?.value?.trim();
+  if (!content || !chatRoomId) return;
+  input.value = '';
+  try {
+    const msg = await api('/api/chat/rooms/' + chatRoomId + '/messages', 'POST', { content });
+    const area = document.getElementById('panel-chat-msgs');
+    if (area) {
+      const empty = area.querySelector('.empty');
+      if (empty) empty.remove();
+      area.insertAdjacentHTML('beforeend', panelMsgBubble(msg));
+      area.scrollTop = area.scrollHeight;
+    }
+    chatLastId = msg.id;
+  } catch(e) { toast('Ошибка отправки', 'error'); }
+}
+
+// ── Chats page ──
+async function loadChats() {
+  const listEl = document.getElementById('chat-rooms-list');
+  try {
+    const rooms = await api('/api/chat/doctor/rooms');
+    if (!(rooms||[]).length) {
+      listEl.innerHTML = '<div class="empty" style="padding:16px;font-size:.78rem">Нет чатов</div>';
+      return;
+    }
+    listEl.innerHTML = rooms.map(r => `
+      <div class="chat-room-item ${chatRoomId===r.id?'active':''}" id="cri-${r.id}" onclick="openChatRoom(${r.id},'${escQ(r.clientUserName||'Пациент')}')">
+        <div class="room-avatar">${initials(r.clientUserName||'П')}</div>
+        <div style="flex:1;min-width:0">
+          <div class="room-name">${esc(r.clientUserName||'Пациент')}</div>
+          <div class="room-preview">${r.lastMessage?esc(r.lastMessage):'<em>Нет сообщений</em>'}</div>
+        </div>
+        ${r.unreadCount>0?`<span style="background:var(--red);color:#fff;font-size:.6rem;font-weight:700;border-radius:8px;padding:1px 5px">${r.unreadCount}</span>`:''}
+      </div>`).join('');
+  } catch(e) {
+    listEl.innerHTML = '<div class="empty">Ошибка</div>';
+  }
+}
+
+async function openChatRoom(roomId, patientName) {
+  stopChatPoll();
+  chatRoomId = roomId; chatLastId = 0;
+  document.querySelectorAll('.chat-room-item').forEach(i => i.classList.remove('active'));
+  document.getElementById('cri-' + roomId)?.classList.add('active');
+  const main = document.getElementById('chat-main');
+  main.innerHTML = `
+    <div class="chat-toolbar">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>
+      <span class="chat-toolbar-title">${esc(patientName)}</span>
+      <span style="font-size:.7rem;opacity:.6">● онлайн</span>
+    </div>
+    <div class="chat-messages" id="chat-msgs"></div>
+    <div class="chat-input-bar">
+      <textarea class="chat-input" id="chat-input" placeholder="Сообщение…" rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg()}"
+        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,80)+'px'"></textarea>
+      <button class="chat-send" onclick="sendChatMsg()">→</button>
+    </div>`;
+  try {
+    const msgs = await api(`/api/chat/rooms/${roomId}/messages`);
+    const area = document.getElementById('chat-msgs');
+    if (msgs.length) {
+      area.innerHTML = msgs.map(m => chatBubble(m)).join('');
+      chatLastId = msgs[msgs.length-1].id;
+    } else {
+      area.innerHTML = '<div class="empty" style="padding:32px">Начните диалог</div>';
+    }
+    area.scrollTop = area.scrollHeight;
+    startChatPoll();
+  } catch(_) {}
+}
+
+function chatBubble(m) {
+  const myName = localStorage.getItem('fullName') || '';
+  const mine = m.senderName === myName;
+  const time = m.sentAt ? new Date(m.sentAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}) : '';
+  return `<div class="bubble ${mine?'mine':'other'}">
+    <div class="bubble-text">${esc2(m.content)}</div>
+    <div class="bubble-meta">${mine?'':esc(m.senderName)+' · '}${time}</div>
+  </div>`;
+}
+
+async function sendChatMsg() {
+  const input = document.getElementById('chat-input');
+  const content = input?.value?.trim();
+  if (!content || !chatRoomId) return;
+  input.value = ''; input.style.height = 'auto';
+  try {
+    const msg = await api('/api/chat/rooms/' + chatRoomId + '/messages', 'POST', { content });
+    const area = document.getElementById('chat-msgs');
+    if (area) {
+      const empty = area.querySelector('.empty');
+      if (empty) empty.remove();
+      area.insertAdjacentHTML('beforeend', chatBubble(msg));
+      area.scrollTop = area.scrollHeight;
+    }
+    chatLastId = msg.id;
+  } catch(e) { toast('Ошибка отправки', 'error'); }
+}
+
+// ── Chat polling ──
+function startChatPoll() {
+  stopChatPoll();
+  chatTimer = setInterval(async () => {
+    if (!chatRoomId) return;
+    try {
+      const msgs = await api(`/api/chat/rooms/${chatRoomId}/messages/poll?sinceId=${chatLastId}`);
+      if (!msgs?.length) return;
+      chatLastId = msgs[msgs.length-1].id;
+      // update main chat area if on chats page
+      const area = document.getElementById('chat-msgs');
+      if (area) {
+        msgs.forEach(m => {
+          const empty = area.querySelector('.empty');
+          if (empty) empty.remove();
+          area.insertAdjacentHTML('beforeend', chatBubble(m));
+        });
+        area.scrollTop = area.scrollHeight;
+      }
+      // update panel chat if open
+      const panelArea = document.getElementById('panel-chat-msgs');
+      if (panelArea) {
+        msgs.forEach(m => {
+          const empty = panelArea.querySelector('.empty');
+          if (empty) empty.remove();
+          panelArea.insertAdjacentHTML('beforeend', panelMsgBubble(m));
+        });
+        panelArea.scrollTop = panelArea.scrollHeight;
+      }
+    } catch(_) {}
+  }, 3000);
+}
+
+function stopChatPoll() {
+  if (chatTimer) { clearInterval(chatTimer); chatTimer = null; }
+}
+
+// ── Auth ──
+function logout() {
+  stopChatPoll();
+  localStorage.clear();
+  window.location.href = '/login.html';
+}
+
+// ── Helpers ──
+const sColors = {CARDIOLOGIST:'#ef4444',SURGEON:'#f97316',NEUROLOGIST:'#8b5cf6',ORTHOPEDIST:'#06b6d4',ONCOLOGIST:'#ec4899',PEDIATRICIAN:'#10b981',UROLOGIST:'#f59e0b',THERAPIST:'#3b82f6'};
+const sLabels = {CARDIOLOGIST:'Кардиолог',SURGEON:'Хирург',NEUROLOGIST:'Невролог',ORTHOPEDIST:'Ортопед',ONCOLOGIST:'Онколог',PEDIATRICIAN:'Педиатр',UROLOGIST:'Уролог',THERAPIST:'Терапевт'};
+function sColor(s){ return sColors[s]||'#6b7280'; }
+function sLabel(s){ return sLabels[s]||s; }
+function initials(n){ const p=(n||'').split(' '); return p.length>=2?p[0][0]+p[1][0]:(n||'??').slice(0,2).toUpperCase(); }
+function fmtDate(s){ return s ? new Date(s).toLocaleDateString('ru-RU') : '—'; }
+function esc(s){ return s==null?'—':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc2(s){ return esc(s).replace(/\n/g,'<br>'); }
+function escQ(s){ return String(s||'').replace(/'/g,"\\'"); }
+function statusLabel(s){ return {TREATMENT:'На лечении',DISCHARGED:'Выписан',TRANSFERRED:'Переведён'}[s]||s; }
+
+function toast(msg, type='info') {
+  const el = document.createElement('div');
+  el.className = 'toast toast-' + type;
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+</script>
+</body>
+</html>

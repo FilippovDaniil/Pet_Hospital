@@ -6,6 +6,8 @@ import com.hospital.dto.response.DoctorResponse;
 import com.hospital.dto.response.PageResponse;
 import com.hospital.dto.response.PatientResponse;
 import com.hospital.entity.Specialty;
+import com.hospital.entity.User;
+import com.hospital.repository.UserRepository;
 import com.hospital.service.DoctorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -15,6 +17,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -45,6 +48,22 @@ import org.springframework.web.bind.annotation.*;
 public class DoctorController {
 
     private final DoctorService doctorService;
+    private final UserRepository userRepository;
+
+    /**
+     * Возвращает профиль врача, привязанного к текущему пользователю.
+     * Используется в doctor.html: после логина врач сразу получает свои данные
+     * без необходимости знать собственный doctorId.
+     *
+     * @param auth JWT-аутентификация текущего пользователя
+     * @return профиль врача, HTTP 200 OK; 404 если врач не связан с этим пользователем
+     */
+    @GetMapping("/me")
+    @Operation(summary = "Профиль текущего врача (по JWT)")
+    public ResponseEntity<DoctorResponse> getMe(Authentication auth) {
+        User user = userRepository.findByUsername(auth.getName()).orElseThrow();
+        return ResponseEntity.ok(doctorService.getMe(user.getId()));
+    }
 
     /**
      * Создаёт нового врача.

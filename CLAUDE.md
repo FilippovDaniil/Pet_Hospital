@@ -14,7 +14,9 @@ docker-compose up -d --build app  # пересобрать после измен
 | Интерфейс | URL | Логин / Пароль |
 |---|---|---|
 | HIS (персонал) | http://localhost:8090 | admin / admin123 |
+| Портал врача | http://localhost:8090/doctor.html | doctor1–doctor6 / doctor123 |
 | Клиентский портал | http://localhost:8090/client.html | client1 / client123 |
+| Личный кабинет клиента | http://localhost:8090/account.html | (через client.html → Кабинет) |
 | Swagger UI | http://localhost:8090/swagger-ui.html | — |
 | Kafdrop | http://localhost:9000 | — |
 | Grafana | http://localhost:3000 | admin / admin |
@@ -32,13 +34,13 @@ src/main/java/com/hospital/
 │   ├── KafkaConfig.java                # топики Kafka + @Primary JpaTransactionManager
 │   ├── CacheConfig.java                # Redis TTL=5мин
 │   ├── AopLoggingAspect.java           # логирование времени всех сервисов
-│   └── DataInitializer.java            # создание 5 дефолтных пользователей
+│   └── DataInitializer.java            # создание 10 дефолтных пользователей + linkDoctorUser()
 │
 ├── controller/
 │   ├── AuthController.java             # /api/auth/login, /register, /register-client
 │   ├── ClientController.java           # /api/client/** (публичный + ROLE_CLIENT)
 │   ├── PatientController.java          # /api/patients
-│   ├── DoctorController.java           # /api/doctors
+│   ├── DoctorController.java           # /api/doctors + GET /api/doctors/me (профиль по JWT)
 │   ├── DepartmentController.java       # /api/departments
 │   ├── WardController.java             # /api/wards
 │   ├── PaidServiceController.java      # /api/paid-services
@@ -116,13 +118,16 @@ src/main/resources/
 │   ├── V3__add_users.sql           # таблица users
 │   ├── V4__client_schema.sql       # appointment + client_service_order
 │   ├── V5__extended_seed_data.sql  # ~45 пациентов, ~25 врачей, ~10 отделений
-│   └── V6__chat_medical_schema.sql # chat_room, chat_message, medical_document,
-│                                   # patient_note + partial unique indexes
+│   ├── V6__chat_medical_schema.sql # chat_room, chat_message, medical_document,
+│   │                               # patient_note + partial unique indexes
+│   └── V7__link_doctor_users.sql   # fallback-линковка doctor2–doctor6 → users (идемпотентно)
 ├── logback-spring.xml              # loki4j appender (async)
 └── static/
-    ├── index.html                  # HIS SPA (admin: чаты+история; doctor: чаты+история)
+    ├── index.html                  # HIS SPA (ROLE_ADMIN, ROLE_NURSE)
     ├── app.js                      # SECTION_ACCESS, loadChats, openPatientHistoryModal
-    └── client.html                 # Клиентский портал (role: CLIENT)
+    ├── client.html                 # Клиентский портал (лендинг, ROLE_CLIENT/public)
+    ├── account.html                # Личный кабинет клиента (ROLE_CLIENT, auth guard)
+    └── doctor.html                 # Портал врача (ROLE_DOCTOR, auth guard, /api/doctors/me)
 ```
 
 ---
@@ -147,9 +152,9 @@ src/main/resources/
 | Роль | Интерфейс | API-префикс |
 |---|---|---|
 | `ROLE_ADMIN` | index.html | `/api/admin/**`, `GET /api/chat/support`, все остальные |
-| `ROLE_DOCTOR` | index.html | `/api/patients/**`, `/api/doctors/**`, `/api/medical/**` (write/read), `GET /api/chat/doctor/rooms` |
+| `ROLE_DOCTOR` | doctor.html | `/api/patients/**`, `/api/doctors/**`, `/api/doctors/me`, `/api/medical/**` (write/read), `GET /api/chat/doctor/rooms` |
 | `ROLE_NURSE` | index.html | `/api/patients/**` (ограниченно) |
-| `ROLE_CLIENT` | client.html | `/api/client/**`, `POST /api/chat/support`, `POST /api/chat/doctor/**`, `GET /api/chat/my-rooms`, `GET /api/medical/documents/my`, `GET /api/medical/history/my` |
+| `ROLE_CLIENT` | client.html + account.html | `/api/client/**`, `POST /api/chat/support`, `POST /api/chat/doctor/**`, `GET /api/chat/my-rooms`, `GET /api/medical/documents/my`, `GET /api/medical/history/my` |
 
 Публичный доступ без токена:
 - `GET /api/client/doctors`, `GET /api/client/departments`, `GET /api/client/services`
@@ -267,7 +272,7 @@ jdbcTemplate.update(
 
 ## Migrations — важное
 
-- Новые миграции нумеруются строго: V7, V8, ... (Flyway не переименовывает применённые)
+- Новые миграции нумеруются строго: V8, V9, ... (Flyway не переименовывает применённые)
 - `ddl-auto: validate` — Hibernate ПРОВЕРЯЕТ схему, не создаёт. Расхождение entity/migration = падение при старте.
 - V5 использует subquery для ID отделений (не хардкодит числа).
 - V6 добавляет: `chat_room`, `chat_message`, `medical_document`, `patient_note`.
@@ -417,6 +422,54 @@ POST /api/chat/doctor/{doctorUserId}
 | `DIAGNOSIS` | Диагноз | false |
 | `OBSERVATION` | Наблюдение | false |
 | `NOTE` | Заметка | false |
+
+---
+
+## Портал врача (doctor.html) — детали
+
+### Учётные данные врачей
+
+| Логин | Пароль | ФИО |
+|---|---|---|
+| `doctor1` | `doctor123` | Иванов Сергей Петрович |
+| `doctor2` | `doctor123` | Захаров Андрей Михайлович |
+| `doctor3` | `doctor123` | Беляев Константин Семёнович |
+| `doctor4` | `doctor123` | Романова Анна Викторовна |
+| `doctor5` | `doctor123` | Тарасова Людмила Витальевна |
+| `doctor6` | `doctor123` | Федосеев Алексей Владимирович |
+
+### Инициализация сессии
+
+При загрузке `doctor.html` вызывается `GET /api/doctors/me` — возвращает запись `doctor` по `users.id` из JWT. Если пользователь не связан с записью врача → редирект на `/login.html`.
+
+### Ключевые функции
+
+- **Мои пациенты**: список с поиском и фильтром статуса; карточки с кнопками
+- **Панель деталей пациента** (выезжает справа, 480px): 4 вкладки:
+  - История: `GET /api/medical/history/patient/{id}` — все заметки + документы
+  - Добавить заметку: `POST /api/medical/notes` (type, content, visibleToClient)
+  - Добавить документ: `POST /api/medical/documents` (type, title, content, validUntil)
+  - Чат: `GET /api/patients/{id}` → `clientUserId` → `POST /api/chat/doctor/{clientUserId}`
+- **Чаты**: двухколоночный интерфейс (список комнат + переписка, short-polling 3с)
+
+### GET /api/doctors/me
+
+```
+GET /api/doctors/me
+Authorization: Bearer <ROLE_DOCTOR token>
+```
+
+Реализован через `DoctorRepository.findByLinkedUserIdAndActiveTrue(userId)`. Возвращает `DoctorResponse`.
+
+### Линковка doctor.user_id
+
+`DataInitializer.linkDoctorUser()` запускается ПОСЛЕ создания пользователей:
+```java
+// UPDATE с guard: user_id IS NULL — идемпотентно
+jdbc.update("UPDATE doctor SET user_id = (SELECT id FROM users WHERE username = ?) " +
+            "WHERE full_name = ? AND user_id IS NULL", username, doctorFullName);
+```
+V7-миграция — резервный fallback (no-op при первом запуске, когда таблица users ещё пуста).
 
 ---
 

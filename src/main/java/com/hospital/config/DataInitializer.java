@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -39,6 +40,7 @@ public class DataInitializer implements ApplicationRunner {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder; // BCryptPasswordEncoder из SecurityConfig
+    private final JdbcTemplate jdbc;
 
     /**
      * Создаёт администратора по умолчанию, если база данных пуста.
@@ -54,11 +56,25 @@ public class DataInitializer implements ApplicationRunner {
      */
     @Override
     public void run(ApplicationArguments args) {
-        createIfAbsent("admin",   "admin123",   "Главный Администратор",   Role.ROLE_ADMIN);
-        createIfAbsent("doctor1", "doctor123",  "Иванов Сергей Петрович",  Role.ROLE_DOCTOR);
-        createIfAbsent("nurse1",  "nurse123",   "Медсестра Петрова А.В.",  Role.ROLE_NURSE);
-        createIfAbsent("client1", "client123",  "Клиент Тестовый Иван",    Role.ROLE_CLIENT);
-        createIfAbsent("client2", "client123",  "Клиент Тестовый Мария",   Role.ROLE_CLIENT);
+        createIfAbsent("admin",   "admin123",   "Главный Администратор",         Role.ROLE_ADMIN);
+        createIfAbsent("doctor1", "doctor123",  "Иванов Сергей Петрович",        Role.ROLE_DOCTOR);
+        createIfAbsent("doctor2", "doctor123",  "Захаров Андрей Михайлович",     Role.ROLE_DOCTOR);
+        createIfAbsent("doctor3", "doctor123",  "Беляев Константин Семёнович",   Role.ROLE_DOCTOR);
+        createIfAbsent("doctor4", "doctor123",  "Романова Анна Викторовна",      Role.ROLE_DOCTOR);
+        createIfAbsent("doctor5", "doctor123",  "Тарасова Людмила Витальевна",   Role.ROLE_DOCTOR);
+        createIfAbsent("doctor6", "doctor123",  "Федосеев Алексей Владимирович", Role.ROLE_DOCTOR);
+        createIfAbsent("nurse1",  "nurse123",   "Медсестра Петрова А.В.",        Role.ROLE_NURSE);
+        createIfAbsent("client1", "client123",  "Клиент Тестовый Иван",          Role.ROLE_CLIENT);
+        createIfAbsent("client2", "client123",  "Клиент Тестовый Мария",         Role.ROLE_CLIENT);
+        // Привязываем учётные записи врачей к их записям в таблице doctor.
+        // Делается здесь (а не в Flyway-миграции), потому что Flyway запускается
+        // ДО DataInitializer: на момент миграции таблица users ещё пуста.
+        linkDoctorUser("doctor1", "Иванов Сергей Петрович");
+        linkDoctorUser("doctor2", "Захаров Андрей Михайлович");
+        linkDoctorUser("doctor3", "Беляев Константин Семёнович");
+        linkDoctorUser("doctor4", "Романова Анна Викторовна");
+        linkDoctorUser("doctor5", "Тарасова Людмила Витальевна");
+        linkDoctorUser("doctor6", "Федосеев Алексей Владимирович");
     }
 
     private void createIfAbsent(String username, String password, String fullName, Role role) {
@@ -71,6 +87,17 @@ public class DataInitializer implements ApplicationRunner {
                     .active(true)
                     .build());
             log.info("Created default user: login={}, role={}", username, role);
+        }
+    }
+
+    private void linkDoctorUser(String username, String doctorFullName) {
+        int updated = jdbc.update(
+            "UPDATE doctor SET user_id = (SELECT id FROM users WHERE username = ?) " +
+            "WHERE full_name = ? AND user_id IS NULL",
+            username, doctorFullName
+        );
+        if (updated > 0) {
+            log.info("Linked user '{}' to doctor '{}'", username, doctorFullName);
         }
     }
 }

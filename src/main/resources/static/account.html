@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Личный кабинет — ГКБ №1</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#1d4ed8;--blue-light:#3b82f6;--blue-dark:#1e3a8a;
+  --green:#059669;--green-light:#d1fae5;
+  --amber:#d97706;--amber-light:#fef3c7;
+  --red:#dc2626;--purple:#7c3aed;
+  --bg:#f1f5f9;--surface:#ffffff;--text:#0f172a;--muted:#64748b;
+  --border:#e2e8f0;--sidebar-w:240px;
+  --shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:0 4px 6px rgba(0,0,0,.07),0 2px 4px rgba(0,0,0,.06);
+  --radius:12px;--radius-sm:8px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+a{text-decoration:none;color:inherit}
+button{cursor:pointer;border:none;background:none}
+input,select,textarea{font-family:inherit}
+
+/* ── Layout ── */
+.layout{display:flex;flex:1;min-height:0}
+
+/* ── Sidebar ── */
+.sidebar{
+  width:var(--sidebar-w);flex-shrink:0;background:var(--blue-dark);
+  display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;
+}
+.sidebar-brand{padding:20px 16px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.1)}
+.sidebar-brand svg{flex-shrink:0}
+.sidebar-brand-text{color:#fff;font-weight:700;font-size:.95rem;line-height:1.2}
+.sidebar-brand-sub{color:rgba(255,255,255,.5);font-size:.7rem}
+.sidebar-profile{padding:16px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:10px}
+.profile-avatar{width:40px;height:40px;border-radius:50%;background:var(--blue-light);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;flex-shrink:0}
+.profile-name{color:#fff;font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.profile-role{color:rgba(255,255,255,.5);font-size:.7rem}
+.sidebar-nav{flex:1;padding:8px 0}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;color:rgba(255,255,255,.65);font-size:.875rem;cursor:pointer;border-left:3px solid transparent;transition:all .15s;width:100%;text-align:left}
+.nav-item:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav-item.active{background:rgba(255,255,255,.1);color:#fff;border-left-color:var(--blue-light)}
+.nav-item .nav-icon{font-size:1rem;flex-shrink:0;width:20px;text-align:center}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:.65rem;font-weight:700;border-radius:10px;min-width:18px;height:18px;padding:0 5px;display:inline-flex;align-items:center;justify-content:center}
+.sidebar-footer{padding:12px 16px;border-top:1px solid rgba(255,255,255,.1)}
+.btn-logout{width:100%;padding:8px 12px;border-radius:var(--radius-sm);background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);font-size:.8rem;display:flex;align-items:center;gap:8px;transition:background .15s}
+.btn-logout:hover{background:rgba(255,255,255,.15);color:#fff}
+
+/* ── Main content ── */
+.main{flex:1;min-width:0;overflow-y:auto;display:flex;flex-direction:column}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 28px;height:60px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:10}
+.topbar h1{font-size:1.15rem;font-weight:600;flex:1}
+.btn-back{display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius-sm);font-size:.8rem;font-weight:500;color:var(--muted);border:1.5px solid var(--border);transition:all .15s}
+.btn-back:hover{color:var(--blue);border-color:var(--blue)}
+.btn-refresh{padding:7px 14px;border-radius:var(--radius-sm);font-size:.8rem;font-weight:500;background:var(--bg);color:var(--muted);border:1.5px solid var(--border);transition:all .15s}
+.btn-refresh:hover{color:var(--blue);border-color:var(--blue)}
+.content{padding:28px;flex:1}
+
+/* ── Section pages ── */
+.page{display:none}.page.active{display:block}
+
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-weight:600;font-size:.95rem}
+.card-body{padding:20px}
+
+/* ── Stats grid ── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+.stat-num{font-size:2rem;font-weight:800;color:var(--blue)}
+.stat-label{font-size:.8rem;color:var(--muted);margin-top:4px}
+
+/* ── Buttons ── */
+.btn{padding:8px 16px;border-radius:var(--radius-sm);font-size:.875rem;font-weight:500;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--blue);color:#fff}.btn-primary:hover{background:var(--blue-dark)}
+.btn-sm{padding:6px 12px;font-size:.8rem}
+.btn-outline{background:transparent;color:var(--blue);border:1.5px solid var(--blue)}.btn-outline:hover{background:var(--blue);color:#fff}
+.btn-ghost-muted{background:transparent;color:var(--muted);border:1.5px solid var(--border)}.btn-ghost-muted:hover{border-color:var(--blue-light);color:var(--blue)}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:#047857}
+
+/* ── List items ── */
+.list-item{padding:14px 16px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;background:var(--surface);transition:box-shadow .15s}
+.list-item:hover{box-shadow:var(--shadow-md)}
+.list-item:last-child{margin-bottom:0}
+.item-title{font-weight:600;font-size:.9rem}
+.item-sub{font-size:.8rem;color:var(--muted);margin-top:2px}
+.status-badge{font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:20px;display:inline-block;margin-top:6px}
+.status-PENDING{background:#fef3c7;color:#92400e}
+.status-CONFIRMED{background:var(--green-light);color:#065f46}
+.status-CANCELLED{background:#fee2e2;color:#991b1b}
+.status-COMPLETED{background:#e0e7ff;color:#3730a3}
+.empty-state{text-align:center;padding:48px 24px;color:var(--muted);font-size:.9rem}
+.empty-icon{font-size:2.5rem;margin-bottom:12px;opacity:.4}
+
+/* ── Medical documents ── */
+.doc-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden;box-shadow:var(--shadow)}
+.doc-header{padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:background .12s}
+.doc-header:hover{background:var(--bg)}
+.doc-type-badge{font-size:.73rem;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0}
+.doc-type-PRESCRIPTION{background:#fef3c7;color:#92400e}
+.doc-type-REFERRAL{background:#e0e7ff;color:#3730a3}
+.doc-type-SICK_LEAVE{background:#fee2e2;color:#991b1b}
+.doc-type-ANALYSIS_ORDER{background:#d1fae5;color:#065f46}
+.doc-type-CERTIFICATE{background:#dbeafe;color:#1e40af}
+.doc-title{font-weight:600;font-size:.9rem;flex:1}
+.doc-meta{font-size:.75rem;color:var(--muted);white-space:nowrap}
+.doc-body{padding:0 16px 16px;border-top:1px solid var(--border);display:none}
+.doc-body.open{display:block;padding-top:12px}
+.doc-content{font-size:.875rem;line-height:1.6;white-space:pre-wrap;background:var(--bg);padding:12px;border-radius:var(--radius-sm)}
+.doc-footer{display:flex;gap:16px;margin-top:10px;font-size:.75rem;color:var(--muted);flex-wrap:wrap}
+.doc-expand{color:var(--muted);font-size:.85rem;flex-shrink:0;transition:transform .2s}
+.doc-expand.open{transform:rotate(180deg)}
+
+/* ── Notes ── */
+.note-card{background:var(--surface);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:10px;border:1px solid var(--border);border-left-width:3px}
+.note-card.type-DIAGNOSIS{border-left-color:var(--red)}
+.note-card.type-OBSERVATION{border-left-color:var(--green)}
+.note-card.type-NOTE{border-left-color:var(--blue-light)}
+.note-type-badge{font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:20px}
+.badge-DIAGNOSIS{background:#fee2e2;color:#991b1b}
+.badge-OBSERVATION{background:#d1fae5;color:#065f46}
+.badge-NOTE{background:#dbeafe;color:#1e40af}
+.note-content{font-size:.875rem;line-height:1.6;margin-top:8px}
+.note-footer{font-size:.72rem;color:var(--muted);margin-top:6px}
+
+/* ── CHAT ── */
+.chat-layout{display:grid;grid-template-columns:260px 1fr;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface);height:520px}
+.chat-rooms-col{border-right:1px solid var(--border);display:flex;flex-direction:column}
+.chat-rooms-header{padding:12px 14px;font-weight:600;font-size:.85rem;background:var(--bg);border-bottom:1px solid var(--border);color:var(--muted)}
+.chat-rooms-list{flex:1;overflow-y:auto;padding:8px}
+.chat-room-item{padding:10px 10px;border-radius:var(--radius-sm);cursor:pointer;border:1px solid transparent;transition:all .15s;margin-bottom:4px;display:flex;align-items:center;gap:10px}
+.chat-room-item:hover{background:var(--bg);border-color:var(--border)}
+.chat-room-item.active{background:#eff6ff;border-color:var(--blue-light)}
+.room-avatar{width:36px;height:36px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;flex-shrink:0}
+.room-name{font-weight:600;font-size:.82rem}
+.room-preview{font-size:.72rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px}
+.chat-main-col{display:flex;flex-direction:column}
+.chat-toolbar{padding:12px 16px;background:var(--blue-dark);color:#fff;display:flex;align-items:center;gap:10px}
+.chat-toolbar-title{font-weight:600;font-size:.9rem;flex:1}
+.chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;background:#f8fafc}
+.bubble{max-width:72%}
+.bubble.mine{align-self:flex-end}
+.bubble.other{align-self:flex-start}
+.bubble-text{padding:9px 13px;border-radius:16px;font-size:.875rem;line-height:1.45;word-wrap:break-word}
+.mine .bubble-text{background:var(--blue);color:#fff;border-bottom-right-radius:3px}
+.other .bubble-text{background:var(--surface);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:3px}
+.bubble-meta{font-size:.68rem;color:var(--muted);margin-top:2px}
+.mine .bubble-meta{text-align:right}
+.chat-input-bar{padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px;background:var(--surface)}
+.chat-input{flex:1;padding:9px 13px;border:1.5px solid var(--border);border-radius:18px;font-size:.875rem;background:var(--bg);resize:none;transition:border-color .15s}
+.chat-input:focus{outline:none;border-color:var(--blue-light);background:var(--surface)}
+.chat-send-btn{padding:9px 18px;background:var(--blue);color:#fff;border-radius:18px;font-size:.8rem;font-weight:600;transition:background .15s;flex-shrink:0}
+.chat-send-btn:hover{background:var(--blue-dark)}
+.chat-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;color:var(--muted);font-size:.875rem;gap:8px}
+.chat-placeholder-icon{font-size:2rem;opacity:.3}
+.chat-empty-msg{text-align:center;padding:40px;color:var(--muted);font-size:.8rem}
+.unread-dot{width:8px;height:8px;background:var(--blue-light);border-radius:50%;flex-shrink:0}
+
+/* ── Toast ── */
+.toast-container{position:fixed;bottom:24px;right:24px;z-index:999;display:flex;flex-direction:column;gap:8px}
+.toast{padding:12px 18px;border-radius:var(--radius-sm);font-size:.875rem;font-weight:500;color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.2);animation:slideIn .25s ease;max-width:320px}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.toast-success{background:#059669}.toast-error{background:#dc2626}.toast-info{background:#1d4ed8}.toast-warning{background:#d97706}
+
+/* ── Misc ── */
+.spinner{width:16px;height:16px;border:2px solid rgba(0,0,0,.1);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:4px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.divider{height:1px;background:var(--border);margin:20px 0}
+.section-title{font-size:1rem;font-weight:600;margin-bottom:16px}
+.form-group{margin-bottom:14px}
+.form-label{display:block;font-size:.82rem;font-weight:500;margin-bottom:5px;color:var(--muted)}
+.form-control{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:.875rem;background:var(--surface);transition:border-color .15s}
+.form-control:focus{outline:none;border-color:var(--blue-light);box-shadow:0 0 0 3px rgba(59,130,246,.12)}
+.form-submit{width:100%;padding:11px;border-radius:var(--radius-sm);font-size:.9rem;font-weight:600;background:var(--blue);color:#fff;transition:background .15s;border:none;cursor:pointer}
+.form-submit:hover{background:var(--blue-dark)}
+.form-error{color:var(--red);font-size:.8rem;margin-top:6px;display:none}
+.tag{font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:20px;background:#dbeafe;color:#1e40af}
+.flex-between{display:flex;align-items:center;justify-content:space-between}
+.flex-gap{display:flex;align-items:center;gap:8px}
+@media(max-width:900px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .chat-layout{grid-template-columns:1fr;height:auto}
+  .chat-rooms-col{height:200px}
+}
+@media(max-width:640px){
+  .sidebar{display:none}
+  .stats-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ════ LAYOUT ════ -->
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <svg width="28" height="28" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="7" fill="#3b82f6"/><path d="M16 8v16M8 16h16" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>
+      <div>
+        <div class="sidebar-brand-text">ГКБ №1</div>
+        <div class="sidebar-brand-sub">Личный кабинет</div>
+      </div>
+    </div>
+    <div class="sidebar-profile">
+      <div class="profile-avatar" id="sidebar-avatar">?</div>
+      <div>
+        <div class="profile-name" id="sidebar-name">Загрузка…</div>
+        <div class="profile-role">Пациент</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" onclick="navigate('overview')" data-page="overview">
+        <span class="nav-icon">◼</span> Сводка
+      </button>
+      <button class="nav-item" onclick="navigate('appointments')" data-page="appointments">
+        <span class="nav-icon">🗓</span> Записи к врачу
+      </button>
+      <button class="nav-item" onclick="navigate('orders')" data-page="orders">
+        <span class="nav-icon">🔬</span> Услуги
+      </button>
+      <button class="nav-item" onclick="navigate('documents')" data-page="documents">
+        <span class="nav-icon">📄</span> Документы
+      </button>
+      <button class="nav-item" onclick="navigate('history')" data-page="history">
+        <span class="nav-icon">📋</span> История болезни
+      </button>
+      <button class="nav-item" onclick="navigate('support')" data-page="support">
+        <span class="nav-icon">💬</span> Поддержка
+        <span class="nav-badge" id="badge-support" style="display:none">0</span>
+      </button>
+      <button class="nav-item" onclick="navigate('chats')" data-page="chats">
+        <span class="nav-icon">👨‍⚕️</span> Чат с врачом
+        <span class="nav-badge" id="badge-chats" style="display:none">0</span>
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="/client.html" style="display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.5);font-size:.78rem;margin-bottom:8px;padding:4px 0">
+        ← На главную
+      </a>
+      <button class="btn-logout" onclick="logout()">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Выйти
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <div class="main">
+    <div class="topbar">
+      <h1 id="topbar-title">Сводка</h1>
+      <button class="btn-refresh" onclick="reloadCurrentPage()">↻ Обновить</button>
+    </div>
+
+    <div class="content">
+
+      <!-- ════ OVERVIEW ════ -->
+      <div class="page active" id="page-overview">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-num" id="ov-appts">—</div><div class="stat-label">Записей к врачу</div></div>
+          <div class="stat-card"><div class="stat-num" id="ov-orders">—</div><div class="stat-label">Заказов услуг</div></div>
+          <div class="stat-card"><div class="stat-num" id="ov-docs">—</div><div class="stat-label">Медицинских документов</div></div>
+          <div class="stat-card"><div class="stat-num" id="ov-notes">—</div><div class="stat-label">Записей в истории</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Последние записи к врачу</span>
+              <button class="btn btn-sm btn-outline" onclick="navigate('appointments')">Все</button>
+            </div>
+            <div class="card-body" id="ov-recent-appts"><div class="empty-state"><div class="empty-icon">🗓</div>Нет записей</div></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Последние заказы</span>
+              <button class="btn btn-sm btn-outline" onclick="navigate('orders')">Все</button>
+            </div>
+            <div class="card-body" id="ov-recent-orders"><div class="empty-state"><div class="empty-icon">🔬</div>Нет заказов</div></div>
+          </div>
+        </div>
+        <div style="margin-top:20px" class="card">
+          <div class="card-header">
+            <span class="card-title">Последние медицинские документы</span>
+            <button class="btn btn-sm btn-outline" onclick="navigate('documents')">Все</button>
+          </div>
+          <div class="card-body" id="ov-recent-docs"><div class="empty-state"><div class="empty-icon">📄</div>Документов пока нет</div></div>
+        </div>
+      </div>
+
+      <!-- ════ APPOINTMENTS ════ -->
+      <div class="page" id="page-appointments">
+        <div class="flex-between" style="margin-bottom:20px">
+          <span style="color:var(--muted);font-size:.875rem">Ваши записи на приём к специалистам</span>
+          <a href="/client.html#doctors"><button class="btn btn-primary btn-sm">+ Записаться к врачу</button></a>
+        </div>
+        <div id="appts-list"><div class="empty-state"><div class="empty-icon">🗓</div>Нет записей к врачу</div></div>
+      </div>
+
+      <!-- ════ ORDERS ════ -->
+      <div class="page" id="page-orders">
+        <div class="flex-between" style="margin-bottom:20px">
+          <span style="color:var(--muted);font-size:.875rem">Ваши заказы платных услуг</span>
+          <a href="/client.html#services"><button class="btn btn-primary btn-sm">Заказать услугу</button></a>
+        </div>
+        <div id="orders-list"><div class="empty-state"><div class="empty-icon">🔬</div>Нет заказов</div></div>
+      </div>
+
+      <!-- ════ DOCUMENTS ════ -->
+      <div class="page" id="page-documents">
+        <p style="color:var(--muted);font-size:.875rem;margin-bottom:20px">Рецепты, направления, больничные листы и другие документы от вашего лечащего врача.</p>
+        <div id="docs-list"><div class="empty-state"><div class="empty-icon">📄</div>Документов пока нет. Они появятся после выдачи врачом.</div></div>
+      </div>
+
+      <!-- ════ HISTORY ════ -->
+      <div class="page" id="page-history">
+        <p style="color:var(--muted);font-size:.875rem;margin-bottom:20px">Диагнозы, наблюдения и заметки, которые ваш врач отметил как доступные вам.</p>
+        <div id="history-list"><div class="empty-state"><div class="empty-icon">📋</div>История пуста. Записи появятся после визита к врачу.</div></div>
+      </div>
+
+      <!-- ════ SUPPORT CHAT ════ -->
+      <div class="page" id="page-support">
+        <p style="color:var(--muted);font-size:.875rem;margin-bottom:16px">Задайте любой вопрос нашим специалистам. Работает круглосуточно.</p>
+        <div id="support-wrap">
+          <div class="empty-state"><span class="spinner"></span> Загрузка чата…</div>
+        </div>
+      </div>
+
+      <!-- ════ DOCTOR CHATS ════ -->
+      <div class="page" id="page-chats">
+        <p style="color:var(--muted);font-size:.875rem;margin-bottom:16px">Переписка с вашими лечащими врачами.</p>
+        <div class="chat-layout" id="chats-layout">
+          <div class="chat-rooms-col">
+            <div class="chat-rooms-header">Ваши чаты</div>
+            <div class="chat-rooms-list" id="doctor-rooms-list">
+              <div style="padding:16px;text-align:center;color:var(--muted);font-size:.8rem">Загрузка…</div>
+            </div>
+          </div>
+          <div class="chat-main-col" id="doctor-chat-main">
+            <div class="chat-placeholder">
+              <div class="chat-placeholder-icon">💬</div>
+              <div>Выберите чат из списка слева</div>
+              <div style="font-size:.75rem;opacity:.6">или откройте новый через страницу врача</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- ── MODAL: Book ── -->
+<div id="modal-book" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--surface);border-radius:var(--radius);width:100%;max-width:480px;box-shadow:0 10px 30px rgba(0,0,0,.2)">
+    <div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between">
+      <h3 style="font-size:1rem;font-weight:600">Записаться к врачу</h3>
+      <button onclick="closeModal('book')" style="width:30px;height:30px;border-radius:6px;background:var(--bg);color:var(--muted);font-size:1.1rem;display:flex;align-items:center;justify-content:center;cursor:pointer">✕</button>
+    </div>
+    <div style="padding:20px 24px 24px">
+      <form onsubmit="doBook(event)">
+        <div class="form-group">
+          <label class="form-label">Врач</label>
+          <select class="form-control" id="book-doctor" required><option value="">— Загрузка врачей… —</option></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Дата</label>
+          <input class="form-control" type="date" id="book-date" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Время</label>
+          <select class="form-control" id="book-time">
+            <option value="">— Любое —</option>
+            <option>08:00–09:00</option><option>09:00–10:00</option><option>10:00–11:00</option>
+            <option>11:00–12:00</option><option>14:00–15:00</option><option>15:00–16:00</option>
+            <option>16:00–17:00</option><option>17:00–18:00</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Телефон</label>
+          <input class="form-control" type="tel" id="book-phone" placeholder="+7 (___) ___-__-__">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Комментарий</label>
+          <textarea class="form-control" id="book-notes" rows="2" placeholder="Опишите жалобы…"></textarea>
+        </div>
+        <div class="form-error" id="book-error"></div>
+        <button type="submit" class="form-submit">Записаться</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+
+<script>
+const API = 'http://localhost:8090';
+let token = localStorage.getItem('clientToken');
+let currentUser = JSON.parse(localStorage.getItem('clientUser') || 'null');
+let allDoctors = [];
+
+// Chat state
+let supportRoomId = null, supportLastId = 0, supportTimer = null;
+let doctorRoomId  = null, doctorLastId  = 0, doctorTimer  = null;
+let currentPage   = 'overview';
+
+// ── Guard: redirect if not logged in ──
+if (!token || !currentUser) {
+  window.location.href = '/client.html';
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  updateSidebarProfile();
+  loadDoctorSelect();
+  loadOverview();
+  setMinDate();
+});
+
+function setMinDate() {
+  const t = new Date(); t.setDate(t.getDate() + 1);
+  const d = document.getElementById('book-date');
+  if (d) d.min = t.toISOString().slice(0,10);
+}
+
+// ── API helper ──
+async function api(path, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API + path, opts);
+  if (res.status === 401) { logout(); return; }
+  if (res.status === 204) return null;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || 'Ошибка ' + res.status);
+  return data;
+}
+
+function updateSidebarProfile() {
+  if (!currentUser) return;
+  const name = currentUser.fullName || currentUser.username || '';
+  const parts = name.trim().split(' ');
+  document.getElementById('sidebar-name').textContent =
+    parts.length >= 2 ? parts[0] + ' ' + parts[1] : name;
+  const av = document.getElementById('sidebar-avatar');
+  av.textContent = parts.length >= 2 ? parts[0][0] + parts[1][0] : name.slice(0,2).toUpperCase();
+}
+
+// ── Navigation ──
+const pageNames = {
+  overview:'Сводка', appointments:'Записи к врачу', orders:'Заказы услуг',
+  documents:'Медицинские документы', history:'История болезни',
+  support:'Служба поддержки', chats:'Чат с врачом'
+};
+
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + page)?.classList.add('active');
+  document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
+  document.getElementById('topbar-title').textContent = pageNames[page] || page;
+  currentPage = page;
+  stopDoctorPoll();
+  stopSupportPoll();
+  if (page === 'overview')      loadOverview();
+  if (page === 'appointments')  loadAppointments();
+  if (page === 'orders')        loadOrders();
+  if (page === 'documents')     loadDocuments();
+  if (page === 'history')       loadHistory();
+  if (page === 'support')       loadSupportChat();
+  if (page === 'chats')         loadDoctorChats();
+}
+
+function reloadCurrentPage() { navigate(currentPage); }
+
+// ── Overview ──
+async function loadOverview() {
+  try {
+    const [appts, orders, docs, hist] = await Promise.all([
+      api('/api/client/appointments/my'),
+      api('/api/client/service-orders/my'),
+      api('/api/medical/documents/my').catch(() => []),
+      api('/api/medical/history/my').catch(() => ({notes:[],documents:[]})),
+    ]);
+    document.getElementById('ov-appts').textContent  = appts.length;
+    document.getElementById('ov-orders').textContent = orders.length;
+    document.getElementById('ov-docs').textContent   = (docs||[]).length;
+    document.getElementById('ov-notes').textContent  = (hist?.notes||[]).length;
+    renderApptsMini(appts.slice(0,4), 'ov-recent-appts');
+    renderOrdersMini(orders.slice(0,4), 'ov-recent-orders');
+    renderDocsMini((docs||[]).slice(0,3), 'ov-recent-docs');
+  } catch(e) { console.error(e); }
+}
+
+// ── Appointments ──
+async function loadAppointments() {
+  const el = document.getElementById('appts-list');
+  el.innerHTML = '<div class="empty-state"><span class="spinner"></span> Загрузка…</div>';
+  try {
+    const appts = await api('/api/client/appointments/my');
+    if (!appts.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">🗓</div>Нет записей. <a href="/client.html" style="color:var(--blue)">Записаться к врачу →</a></div>'; return; }
+    el.innerHTML = appts.map(a => apptCard(a)).join('');
+  } catch(e) { el.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; }
+}
+
+function apptCard(a) {
+  return `<div class="list-item">
+    <div class="flex-between">
+      <div>
+        <div class="item-title">👨‍⚕️ ${esc(a.doctorName)}</div>
+        <div class="item-sub">${esc(a.departmentName)}${a.doctorSpecialty?' · '+sLabel(a.doctorSpecialty):''}</div>
+        <div class="item-sub">📅 ${fmtDate(a.preferredDate)}${a.preferredTime?' &nbsp;🕐 '+esc(a.preferredTime):''}</div>
+        ${a.contactPhone?`<div class="item-sub">📞 ${esc(a.contactPhone)}</div>`:''}
+        ${a.notes?`<div class="item-sub" style="margin-top:4px;color:var(--text);font-style:italic">"${esc(a.notes)}"</div>`:''}
+      </div>
+      <span class="status-badge status-${a.status}">${statusLabel(a.status)}</span>
+    </div>
+  </div>`;
+}
+
+function renderApptsMini(appts, id) {
+  const el = document.getElementById(id);
+  if (!appts.length) { el.innerHTML = '<div class="empty-state" style="padding:20px">Нет записей</div>'; return; }
+  el.innerHTML = appts.map(a => `
+    <div class="list-item" style="margin-bottom:8px">
+      <div class="item-title">${esc(a.doctorName)}</div>
+      <div class="item-sub">📅 ${fmtDate(a.preferredDate)}</div>
+      <span class="status-badge status-${a.status}">${statusLabel(a.status)}</span>
+    </div>`).join('');
+}
+
+// ── Orders ──
+async function loadOrders() {
+  const el = document.getElementById('orders-list');
+  el.innerHTML = '<div class="empty-state"><span class="spinner"></span> Загрузка…</div>';
+  try {
+    const orders = await api('/api/client/service-orders/my');
+    if (!orders.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">🔬</div>Нет заказов. <a href="/client.html#services" style="color:var(--blue)">Выбрать услугу →</a></div>'; return; }
+    el.innerHTML = orders.map(o => orderCard(o)).join('');
+  } catch(e) { el.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; }
+}
+
+function orderCard(o) {
+  return `<div class="list-item">
+    <div class="flex-between">
+      <div>
+        <div class="item-title">🔬 ${esc(o.serviceName)}</div>
+        <div class="item-sub">💰 ${fmtPrice(o.servicePrice)} ₽</div>
+        <div class="item-sub">📅 ${fmtDate(o.createdAt)}</div>
+        ${o.notes?`<div class="item-sub" style="margin-top:4px;font-style:italic">"${esc(o.notes)}"</div>`:''}
+      </div>
+      <span class="status-badge status-${o.status}">${statusLabel(o.status)}</span>
+    </div>
+  </div>`;
+}
+
+function renderOrdersMini(orders, id) {
+  const el = document.getElementById(id);
+  if (!orders.length) { el.innerHTML = '<div class="empty-state" style="padding:20px">Нет заказов</div>'; return; }
+  el.innerHTML = orders.map(o => `
+    <div class="list-item" style="margin-bottom:8px">
+      <div class="item-title">${esc(o.serviceName)}</div>
+      <div class="item-sub">💰 ${fmtPrice(o.servicePrice)} ₽ &nbsp; 📅 ${fmtDate(o.createdAt)}</div>
+      <span class="status-badge status-${o.status}">${statusLabel(o.status)}</span>
+    </div>`).join('');
+}
+
+// ── Documents ──
+async function loadDocuments() {
+  const el = document.getElementById('docs-list');
+  el.innerHTML = '<div class="empty-state"><span class="spinner"></span> Загрузка…</div>';
+  try {
+    const docs = await api('/api/medical/documents/my');
+    if (!docs.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📄</div>Документов нет. Они появятся после визита к врачу.</div>'; return; }
+    el.innerHTML = docs.map(d => docCard(d)).join('');
+  } catch(e) { el.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; }
+}
+
+function docCard(d) {
+  return `<div class="doc-card">
+    <div class="doc-header" onclick="toggleDoc(this)">
+      <span class="doc-type-badge doc-type-${d.type}">${esc(d.typeLabel)}</span>
+      <span class="doc-title">${esc(d.title)}</span>
+      <span class="doc-meta">${fmtDate(d.issuedAt)}</span>
+      <span class="doc-expand">▼</span>
+    </div>
+    <div class="doc-body">
+      <div class="doc-content">${esc2(d.content)}</div>
+      <div class="doc-footer">
+        <span>👨‍⚕️ ${esc(d.doctorName)}</span>
+        ${d.validUntil?`<span>⏳ Действует до: ${fmtDate(d.validUntil)}</span>`:''}
+        <span class="status-badge ${d.active?'status-CONFIRMED':'status-CANCELLED'}">${d.active?'Действует':'Аннулирован'}</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleDoc(hdr) {
+  const body = hdr.nextElementSibling;
+  const exp  = hdr.querySelector('.doc-expand');
+  body.classList.toggle('open');
+  exp.classList.toggle('open');
+  exp.textContent = body.classList.contains('open') ? '▲' : '▼';
+}
+
+function renderDocsMini(docs, id) {
+  const el = document.getElementById(id);
+  if (!docs.length) { el.innerHTML = '<div class="empty-state" style="padding:20px">Документов нет</div>'; return; }
+  el.innerHTML = docs.map(d => docCard(d)).join('');
+}
+
+// ── History ──
+async function loadHistory() {
+  const el = document.getElementById('history-list');
+  el.innerHTML = '<div class="empty-state"><span class="spinner"></span> Загрузка…</div>';
+  try {
+    const hist = await api('/api/medical/history/my');
+    const notes = hist?.notes || [];
+    if (!notes.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>История пуста. Записи появятся после визита к врачу.</div>'; return; }
+    el.innerHTML = notes.map(n => `
+      <div class="note-card type-${n.type}">
+        <div class="flex-between">
+          <span class="note-type-badge badge-${n.type}">${esc(n.typeLabel)}</span>
+          <span style="font-size:.72rem;color:var(--muted)">${fmtDate(n.createdAt)}</span>
+        </div>
+        <div class="note-content">${esc2(n.content)}</div>
+        <div class="note-footer">👨‍⚕️ ${esc(n.doctorName)}</div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; }
+}
+
+// ── Support Chat ──
+async function loadSupportChat() {
+  const wrap = document.getElementById('support-wrap');
+  wrap.innerHTML = '<div class="empty-state"><span class="spinner"></span> Загрузка…</div>';
+  try {
+    const room = await api('/api/chat/support', 'POST');
+    supportRoomId = room.id;
+    const msgs = await api(`/api/chat/rooms/${room.id}/messages`);
+    wrap.innerHTML = buildChatHTML('support', 'Служба поддержки');
+    renderMsgs(msgs, 'support');
+    if (msgs.length) supportLastId = msgs[msgs.length-1].id;
+    startSupportPoll();
+  } catch(e) {
+    wrap.innerHTML = '<div class="empty-state">Не удалось загрузить чат</div>';
+  }
+}
+
+// ── Doctor Chats ──
+async function loadDoctorChats() {
+  const listEl = document.getElementById('doctor-rooms-list');
+  try {
+    const rooms = await api('/api/chat/my-rooms');
+    const drRooms = (rooms||[]).filter(r => r.type === 'DOCTOR_CLIENT');
+    if (!drRooms.length) {
+      listEl.innerHTML = '<div style="padding:16px;font-size:.8rem;color:var(--muted)">Нет чатов с врачом</div>';
+      return;
+    }
+    listEl.innerHTML = drRooms.map(r => `
+      <div class="chat-room-item" id="room-item-${r.id}" onclick="openDoctorChatRoom(${r.id},'${escQ(r.staffUserName||'Врач')}')">
+        <div class="room-avatar">${initials(r.staffUserName||'ВР')}</div>
+        <div style="flex:1;min-width:0">
+          <div class="room-name">${esc(r.staffUserName||'Врач')}</div>
+          <div class="room-preview">${r.lastMessage?esc(r.lastMessage):'<em>Нет сообщений</em>'}</div>
+        </div>
+        ${r.unreadCount>0?`<div class="unread-dot"></div>`:''}
+      </div>`).join('');
+  } catch(e) { listEl.innerHTML = '<div style="padding:16px;font-size:.8rem;color:var(--muted)">Ошибка загрузки</div>'; }
+}
+
+async function openDoctorChatRoom(roomId, doctorName) {
+  stopDoctorPoll();
+  doctorRoomId = roomId;
+  document.querySelectorAll('.chat-room-item').forEach(i => i.classList.remove('active'));
+  document.getElementById('room-item-' + roomId)?.classList.add('active');
+  const main = document.getElementById('doctor-chat-main');
+  main.innerHTML = buildChatHTML('doctor', doctorName);
+  try {
+    const msgs = await api(`/api/chat/rooms/${roomId}/messages`);
+    renderMsgs(msgs, 'doctor');
+    if (msgs.length) doctorLastId = msgs[msgs.length-1].id;
+    startDoctorPoll();
+  } catch(e) {}
+}
+
+// ── Chat rendering ──
+function buildChatHTML(type, title) {
+  return `
+    <div class="chat-toolbar">
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>
+      <span class="chat-toolbar-title">${title}</span>
+      <span style="font-size:.72rem;opacity:.6">● онлайн</span>
+    </div>
+    <div class="chat-messages" id="chat-msgs-${type}"></div>
+    <div class="chat-input-bar">
+      <textarea class="chat-input" id="chat-input-${type}" placeholder="Напишите сообщение…" rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg('${type}')}"
+        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,90)+'px'"></textarea>
+      <button class="chat-send-btn" onclick="sendMsg('${type}')">→</button>
+    </div>`;
+}
+
+function renderMsgs(msgs, type) {
+  const area = document.getElementById('chat-msgs-' + type);
+  if (!area) return;
+  if (!msgs.length) { area.innerHTML = '<div class="chat-empty-msg">Начните диалог — напишите первое сообщение</div>'; return; }
+  area.innerHTML = msgs.map(m => msgBubble(m)).join('');
+  area.scrollTop = area.scrollHeight;
+}
+
+function msgBubble(m) {
+  const myName = currentUser?.fullName || currentUser?.username || '';
+  const mine = m.senderName === myName;
+  const time = m.sentAt ? new Date(m.sentAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}) : '';
+  return `<div class="bubble ${mine?'mine':'other'}">
+    <div class="bubble-text">${esc2(m.content)}</div>
+    <div class="bubble-meta">${mine?'':esc(m.senderName)+' · '}${time}</div>
+  </div>`;
+}
+
+function appendMsg(m, type) {
+  const area = document.getElementById('chat-msgs-' + type);
+  if (!area) return;
+  const empty = area.querySelector('.chat-empty-msg');
+  if (empty) empty.remove();
+  area.insertAdjacentHTML('beforeend', msgBubble(m));
+  area.scrollTop = area.scrollHeight;
+}
+
+async function sendMsg(type) {
+  const input = document.getElementById('chat-input-' + type);
+  const content = input?.value?.trim();
+  if (!content) return;
+  const roomId = type === 'support' ? supportRoomId : doctorRoomId;
+  if (!roomId) { toast('Чат не загружен', 'error'); return; }
+  input.value = ''; input.style.height = 'auto';
+  try {
+    const msg = await api('/api/chat/rooms/' + roomId + '/messages', 'POST', { content });
+    appendMsg(msg, type);
+    if (type === 'support') supportLastId = msg.id;
+    else doctorLastId = msg.id;
+  } catch(e) { toast('Ошибка отправки', 'error'); }
+}
+
+// ── Polling ──
+function startSupportPoll() {
+  stopSupportPoll();
+  supportTimer = setInterval(async () => {
+    if (!supportRoomId) return;
+    try {
+      const msgs = await api(`/api/chat/rooms/${supportRoomId}/messages/poll?sinceId=${supportLastId}`);
+      if (msgs?.length) { msgs.forEach(m => appendMsg(m,'support')); supportLastId = msgs[msgs.length-1].id; }
+    } catch(_) {}
+  }, 3000);
+}
+function stopSupportPoll() { if (supportTimer) { clearInterval(supportTimer); supportTimer = null; } }
+
+function startDoctorPoll() {
+  stopDoctorPoll();
+  doctorTimer = setInterval(async () => {
+    if (!doctorRoomId) return;
+    try {
+      const msgs = await api(`/api/chat/rooms/${doctorRoomId}/messages/poll?sinceId=${doctorLastId}`);
+      if (msgs?.length) { msgs.forEach(m => appendMsg(m,'doctor')); doctorLastId = msgs[msgs.length-1].id; }
+    } catch(_) {}
+  }, 3000);
+}
+function stopDoctorPoll() { if (doctorTimer) { clearInterval(doctorTimer); doctorTimer = null; } }
+
+// ── Book ──
+async function loadDoctorSelect() {
+  try {
+    allDoctors = await api('/api/client/doctors');
+    const sel = document.getElementById('book-doctor');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— Выберите врача —</option>' +
+      allDoctors.map(d => `<option value="${d.id}">${esc(d.fullName)} (${sLabel(d.specialty)})</option>`).join('');
+  } catch(_) {}
+}
+
+async function doBook(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('book-error'); errEl.style.display = 'none';
+  try {
+    await api('/api/client/appointments', 'POST', {
+      doctorId:      +document.getElementById('book-doctor').value,
+      preferredDate: document.getElementById('book-date').value,
+      preferredTime: document.getElementById('book-time').value || null,
+      contactPhone:  document.getElementById('book-phone').value || null,
+      notes:         document.getElementById('book-notes').value || null,
+    });
+    closeModal('book');
+    e.target.reset();
+    toast('Запись создана! Ожидайте подтверждения.', 'success');
+    if (currentPage === 'appointments') loadAppointments();
+    if (currentPage === 'overview')     loadOverview();
+  } catch(err) { errEl.textContent = err.message; errEl.style.display = 'block'; }
+}
+
+function openModal(id) { document.getElementById('modal-' + id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById('modal-' + id).style.display = 'none'; }
+
+// ── Auth ──
+function logout() {
+  stopSupportPoll(); stopDoctorPoll();
+  localStorage.removeItem('clientToken');
+  localStorage.removeItem('clientUser');
+  window.location.href = '/client.html';
+}
+
+// ── Helpers ──
+const sLabels = {CARDIOLOGIST:'Кардиолог',SURGEON:'Хирург',NEUROLOGIST:'Невролог',ORTHOPEDIST:'Ортопед',ONCOLOGIST:'Онколог',PEDIATRICIAN:'Педиатр',UROLOGIST:'Уролог',THERAPIST:'Терапевт'};
+function sLabel(s){ return sLabels[s]||s; }
+function initials(n){ const p=(n||'').split(' '); return p.length>=2?p[0][0]+p[1][0]:(n||'??').slice(0,2).toUpperCase(); }
+function fmtDate(s){ return s ? new Date(s).toLocaleDateString('ru-RU') : '—'; }
+function fmtPrice(n){ return Number(n).toLocaleString('ru-RU'); }
+function esc(s){ return s==null?'—':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc2(s){ return esc(s).replace(/\n/g,'<br>'); }
+function escQ(s){ return String(s||'').replace(/'/g,"\\'"); }
+function statusLabel(s){ return {PENDING:'Ожидает',CONFIRMED:'Подтверждено',CANCELLED:'Отменено',COMPLETED:'Выполнено'}[s]||s; }
+
+function toast(msg, type='info') {
+  const el = document.createElement('div');
+  el.className = 'toast toast-' + type;
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+</script>
+</body>
+</html>
