@@ -323,7 +323,7 @@ mvn test -Dtest="AuthIntegrationTest,PatientIntegrationTest,ChatIntegrationTest,
 mvn test
 ```
 
-**Итого: 193 теста — 70 юнит + 57 интеграционных + 66 из предыдущих сессий**
+**Итого: 213 теста — 80 юнит + 67 интеграционных + 66 из предыдущих сессий**
 
 **Windows**: Docker Desktop → Settings → General → "Expose daemon on tcp://localhost:2375 without TLS"
 
@@ -340,13 +340,13 @@ mvn test
 |---|---|---|---|
 | `JwtUtilTest` | Юнит | 5 | Генерация/валидация JWT |
 | `AdminServiceTest` | Юнит | 9 | Выписка пациентов, Strategy pattern |
-| `PatientServiceTest` | Юнит | 10 | CRUD пациентов, soft-delete |
+| `PatientServiceTest` | Юнит | 16 | CRUD пациентов, soft-delete, clientUserId, авто-чат |
 | `WardServiceTest` | Юнит | 5 | Размещение в палате |
-| `ChatServiceTest` | Юнит | 20 | Все методы ChatServiceImpl, IDOR |
+| `ChatServiceTest` | Юнит | 24 | Все методы ChatServiceImpl, IDOR, двунаправленный чат |
 | `MedicalServiceTest` | Юнит | 21 | Все методы MedicalServiceImpl, типы/labels |
 | `AuthIntegrationTest` | Интеграционный | 10 | Логин, регистрация, 401/403 |
-| `PatientIntegrationTest` | Интеграционный | 8 | CRUD пациентов через HTTP |
-| `ChatIntegrationTest` | Интеграционный | 13 | RBAC чата, идемпотентность, send+poll |
+| `PatientIntegrationTest` | Интеграционный | 10 | CRUD пациентов через HTTP, clientUserId, авто-чат |
+| `ChatIntegrationTest` | Интеграционный | 17 | RBAC чата, идемпотентность, send+poll, двунаправленный чат |
 | `MedicalIntegrationTest` | Интеграционный | 23 | RBAC медицины, создание, e2e |
 
 ### Особенности тестирования на Windows

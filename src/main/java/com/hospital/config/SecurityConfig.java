@@ -160,8 +160,8 @@ public class SecurityConfig {
                 // Чат поддержки: POST создаёт/получает комнату для клиента, GET — список для админа
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/chat/support").hasRole("CLIENT")
                 .requestMatchers(org.springframework.http.HttpMethod.GET,  "/api/chat/support").hasRole("ADMIN")
-                // Чат клиента с врачом
-                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/chat/doctor/**").hasRole("CLIENT")
+                // Чат клиента с врачом: инициировать может и клиент (doctorUserId в пути), и врач (clientUserId в пути)
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/chat/doctor/**").hasAnyRole("CLIENT", "DOCTOR")
                 .requestMatchers("/api/chat/doctor/rooms").hasRole("DOCTOR")
                 .requestMatchers("/api/chat/my-rooms").hasRole("CLIENT")
                 // Сообщения — доступны всем аутентифицированным участникам (проверка в сервисе)

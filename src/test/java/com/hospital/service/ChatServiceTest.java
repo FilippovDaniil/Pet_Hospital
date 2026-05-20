@@ -472,4 +472,92 @@ class ChatServiceTest {
         assertThat(response.getLastMessage()).isNull();
         assertThat(response.getLastMessageAt()).isNull();
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // getOrCreateDoctorRoom — вызов от имени врача (двунаправленная инициация)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Врач вызывает getOrCreateDoctorRoom с clientUserId — должна быть создана
+     * комната, где clientUser = client (id=1), staffUser = doctor (id=2).
+     * Это обратный порядок по сравнению с клиентским путём.
+     */
+    @Test
+    void getOrCreateDoctorRoom_calledByDoctor_createsRoomWithCorrectRoles() {
+        // doctor (id=2) вызывает с otherUserId=1 (clientUser)
+        when(userRepository.findById(1L)).thenReturn(Optional.of(clientUser));
+        when(chatRoomRepository.findByTypeAndClientUserIdAndStaffUserId(
+                ChatRoomType.DOCTOR_CLIENT, 1L, 2L))
+                .thenReturn(Optional.empty());
+        when(chatRoomRepository.save(any(ChatRoom.class))).thenReturn(doctorRoom);
+        when(chatMessageRepository.countUnread(20L, 2L)).thenReturn(0L);
+        when(chatMessageRepository.findByRoomIdOrderBySentAt(20L)).thenReturn(List.of());
+
+        ChatRoomResponse response = chatService.getOrCreateDoctorRoom(doctorUser, 1L);
+
+        // Проверяем, что в сохранённой комнате client и doctor расставлены правильно
+        verify(chatRoomRepository).save(argThat(room ->
+                room.getType() == ChatRoomType.DOCTOR_CLIENT
+                && room.getClientUser().getId().equals(1L)
+                && room.getStaffUser().getId().equals(2L)));
+        assertThat(response.getId()).isEqualTo(20L);
+    }
+
+    /**
+     * Врач вызывает getOrCreateDoctorRoom — если комната уже существует,
+     * новая не создаётся.
+     */
+    @Test
+    void getOrCreateDoctorRoom_calledByDoctor_returnsExistingRoomWithoutSave() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(clientUser));
+        when(chatRoomRepository.findByTypeAndClientUserIdAndStaffUserId(
+                ChatRoomType.DOCTOR_CLIENT, 1L, 2L))
+                .thenReturn(Optional.of(doctorRoom));
+        when(chatMessageRepository.countUnread(20L, 2L)).thenReturn(0L);
+        when(chatMessageRepository.findByRoomIdOrderBySentAt(20L)).thenReturn(List.of());
+
+        ChatRoomResponse response = chatService.getOrCreateDoctorRoom(doctorUser, 1L);
+
+        verify(chatRoomRepository, never()).save(any());
+        assertThat(response.getId()).isEqualTo(20L);
+        assertThat(response.getType()).isEqualTo("DOCTOR_CLIENT");
+    }
+
+    /**
+     * Врач вызывает getOrCreateDoctorRoom с otherUserId, у которого нет роли ROLE_CLIENT —
+     * ожидаем ResourceNotFoundException.
+     * Врач не может открыть чат с администратором или другим врачом.
+     */
+    @Test
+    void getOrCreateDoctorRoom_calledByDoctor_withNonClientOtherUser_throwsException() {
+        // adminUser имеет ROLE_ADMIN, а не ROLE_CLIENT
+        when(userRepository.findById(3L)).thenReturn(Optional.of(adminUser));
+
+        assertThatThrownBy(() -> chatService.getOrCreateDoctorRoom(doctorUser, 3L))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("3");
+    }
+
+    /**
+     * Клиент вызывает getOrCreateDoctorRoom — существующее поведение сохраняется.
+     * Проверяет, что рефакторинг под двунаправленность не сломал клиентский путь:
+     * clientUser остаётся clientUser, doctorUser — staffUser.
+     */
+    @Test
+    void getOrCreateDoctorRoom_calledByClient_assignsRolesCorrectly() {
+        // clientUser (id=1) вызывает с otherUserId=2 (doctorUser)
+        when(userRepository.findById(2L)).thenReturn(Optional.of(doctorUser));
+        when(chatRoomRepository.findByTypeAndClientUserIdAndStaffUserId(
+                ChatRoomType.DOCTOR_CLIENT, 1L, 2L))
+                .thenReturn(Optional.empty());
+        when(chatRoomRepository.save(any(ChatRoom.class))).thenReturn(doctorRoom);
+        when(chatMessageRepository.countUnread(20L, 1L)).thenReturn(0L);
+        when(chatMessageRepository.findByRoomIdOrderBySentAt(20L)).thenReturn(List.of());
+
+        chatService.getOrCreateDoctorRoom(clientUser, 2L);
+
+        verify(chatRoomRepository).save(argThat(room ->
+                room.getClientUser().getId().equals(1L)
+                && room.getStaffUser().getId().equals(2L)));
+    }
 }

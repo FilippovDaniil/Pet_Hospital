@@ -49,6 +49,10 @@ class PatientServiceTest {
     private PaidServiceMapper paidServiceMapper;
     @Mock
     private EventPublisher eventPublisher;
+    @Mock
+    private com.hospital.repository.UserRepository userRepository;
+    @Mock
+    private ChatRoomRepository chatRoomRepository;
 
     @InjectMocks
     private PatientServiceImpl patientService;
@@ -201,5 +205,142 @@ class PatientServiceTest {
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getPage()).isEqualTo(0);
         assertThat(result.getContent()).hasSize(1);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // create() с clientUserId
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    void createPatient_withClientUserId_linksToPortalUser() {
+        User portalUser = User.builder().id(5L).username("client1").role(Role.ROLE_CLIENT).active(true).build();
+
+        CreatePatientRequest request = new CreatePatientRequest();
+        request.setFullName("Linked Patient");
+        request.setSnils("555-666-777 88");
+        request.setBirthDate(LocalDate.of(1990, 1, 1));
+        request.setGender(Gender.MALE);
+        request.setClientUserId(5L);
+
+        when(patientRepository.existsBySnilsAndActiveTrue(anyString())).thenReturn(false);
+        when(patientMapper.toEntity(request)).thenReturn(patient);
+        when(userRepository.findById(5L)).thenReturn(Optional.of(portalUser));
+        when(patientRepository.save(any(Patient.class))).thenReturn(patient);
+        when(patientMapper.toResponse(patient)).thenReturn(new PatientResponse());
+
+        patientService.create(request);
+
+        verify(userRepository).findById(5L);
+        assertThat(patient.getClientUser()).isEqualTo(portalUser);
+    }
+
+    @Test
+    void createPatient_withInvalidClientUserId_throwsResourceNotFoundException() {
+        CreatePatientRequest request = new CreatePatientRequest();
+        request.setFullName("Invalid Link Patient");
+        request.setSnils("555-666-777 99");
+        request.setClientUserId(999L);
+
+        when(patientRepository.existsBySnilsAndActiveTrue(anyString())).thenReturn(false);
+        when(patientMapper.toEntity(request)).thenReturn(patient);
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> patientService.create(request))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // assignDoctor() — автоматическое создание чат-комнаты
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    void assignDoctor_withClientAndLinkedDoctor_createsChatRoom() {
+        User portalClient = User.builder().id(5L).role(Role.ROLE_CLIENT).build();
+        User linkedDoctorUser = User.builder().id(6L).role(Role.ROLE_DOCTOR).build();
+        Doctor doctorWithLink = Doctor.builder()
+                .id(10L).fullName("Dr Smith").specialty(Specialty.CARDIOLOGIST)
+                .active(true).linkedUser(linkedDoctorUser).build();
+        Patient patientWithClient = Patient.builder()
+                .id(1L).fullName("Test Patient").birthDate(LocalDate.of(1990, 1, 1))
+                .gender(Gender.MALE).snils("123-456-789 01").registrationDate(LocalDate.now())
+                .status(PatientStatus.TREATMENT).active(true).clientUser(portalClient).build();
+
+        when(patientRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(patientWithClient));
+        when(doctorRepository.findByIdAndActiveTrue(10L)).thenReturn(Optional.of(doctorWithLink));
+        when(patientRepository.countActivePatientsByDoctorId(10L)).thenReturn(0L);
+        when(patientRepository.save(any(Patient.class))).thenReturn(patientWithClient);
+        when(chatRoomRepository.findByTypeAndClientUserIdAndStaffUserId(
+                ChatRoomType.DOCTOR_CLIENT, 5L, 6L)).thenReturn(Optional.empty());
+        when(patientMapper.toResponse(patientWithClient)).thenReturn(new PatientResponse());
+
+        patientService.assignDoctor(1L, 10L);
+
+        verify(chatRoomRepository).save(argThat(room ->
+                room.getType() == ChatRoomType.DOCTOR_CLIENT
+                && room.getClientUser().getId().equals(5L)
+                && room.getStaffUser().getId().equals(6L)));
+    }
+
+    @Test
+    void assignDoctor_withClientButNoLinkedDoctor_doesNotCreateChatRoom() {
+        User portalClient = User.builder().id(5L).role(Role.ROLE_CLIENT).build();
+        Patient patientWithClient = Patient.builder()
+                .id(1L).fullName("Test Patient").birthDate(LocalDate.of(1990, 1, 1))
+                .gender(Gender.MALE).snils("123-456-789 01").registrationDate(LocalDate.now())
+                .status(PatientStatus.TREATMENT).active(true).clientUser(portalClient).build();
+
+        when(patientRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(patientWithClient));
+        when(doctorRepository.findByIdAndActiveTrue(10L)).thenReturn(Optional.of(doctor));
+        when(patientRepository.countActivePatientsByDoctorId(10L)).thenReturn(0L);
+        when(patientRepository.save(any(Patient.class))).thenReturn(patientWithClient);
+        when(patientMapper.toResponse(patientWithClient)).thenReturn(new PatientResponse());
+
+        patientService.assignDoctor(1L, 10L);
+
+        verify(chatRoomRepository, never()).save(any(ChatRoom.class));
+    }
+
+    @Test
+    void assignDoctor_withLinkedDoctorButNoClientUser_doesNotCreateChatRoom() {
+        User linkedDoctorUser = User.builder().id(6L).role(Role.ROLE_DOCTOR).build();
+        Doctor doctorWithLink = Doctor.builder()
+                .id(10L).fullName("Dr Smith").specialty(Specialty.CARDIOLOGIST)
+                .active(true).linkedUser(linkedDoctorUser).build();
+
+        when(patientRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(patient));
+        when(doctorRepository.findByIdAndActiveTrue(10L)).thenReturn(Optional.of(doctorWithLink));
+        when(patientRepository.countActivePatientsByDoctorId(10L)).thenReturn(0L);
+        when(patientRepository.save(any(Patient.class))).thenReturn(patient);
+        when(patientMapper.toResponse(patient)).thenReturn(new PatientResponse());
+
+        patientService.assignDoctor(1L, 10L);
+
+        verify(chatRoomRepository, never()).save(any(ChatRoom.class));
+    }
+
+    @Test
+    void assignDoctor_chatRoomAlreadyExists_doesNotCreateDuplicate() {
+        User portalClient = User.builder().id(5L).role(Role.ROLE_CLIENT).build();
+        User linkedDoctorUser = User.builder().id(6L).role(Role.ROLE_DOCTOR).build();
+        Doctor doctorWithLink = Doctor.builder()
+                .id(10L).fullName("Dr Smith").specialty(Specialty.CARDIOLOGIST)
+                .active(true).linkedUser(linkedDoctorUser).build();
+        Patient patientWithClient = Patient.builder()
+                .id(1L).fullName("Test Patient").birthDate(LocalDate.of(1990, 1, 1))
+                .gender(Gender.MALE).snils("123-456-789 01").registrationDate(LocalDate.now())
+                .status(PatientStatus.TREATMENT).active(true).clientUser(portalClient).build();
+
+        when(patientRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(patientWithClient));
+        when(doctorRepository.findByIdAndActiveTrue(10L)).thenReturn(Optional.of(doctorWithLink));
+        when(patientRepository.countActivePatientsByDoctorId(10L)).thenReturn(0L);
+        when(patientRepository.save(any(Patient.class))).thenReturn(patientWithClient);
+        when(chatRoomRepository.findByTypeAndClientUserIdAndStaffUserId(
+                ChatRoomType.DOCTOR_CLIENT, 5L, 6L))
+                .thenReturn(Optional.of(ChatRoom.builder().id(30L).build()));
+        when(patientMapper.toResponse(patientWithClient)).thenReturn(new PatientResponse());
+
+        patientService.assignDoctor(1L, 10L);
+
+        verify(chatRoomRepository, never()).save(any(ChatRoom.class));
     }
 }

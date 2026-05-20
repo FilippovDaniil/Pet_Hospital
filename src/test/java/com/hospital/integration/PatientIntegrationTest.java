@@ -8,16 +8,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import org.springframework.security.test.context.support.WithMockUser;
 
 import java.time.LocalDate;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -47,6 +50,9 @@ class PatientIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void createPatient_returnsCreated() throws Exception {
@@ -165,5 +171,85 @@ class PatientIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/patients/search?status=TREATMENT"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // clientUserId — привязка пациента к порталу
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Создание пациента с clientUserId — в ответе должен быть заполнен clientUserId.
+     * Проверяет, что сервис привязывает patient.clientUser к порталу и маппер
+     * возвращает clientUserId в PatientResponse.
+     */
+    @Test
+    void createPatient_withClientUserId_returnsPatientWithClientUserId() throws Exception {
+        Long clientUserId = jdbcTemplate.queryForObject(
+                "SELECT id FROM users WHERE username = 'client1'", Long.class);
+
+        CreatePatientRequest request = new CreatePatientRequest();
+        request.setFullName("Portal Linked Patient");
+        request.setBirthDate(LocalDate.of(1992, 7, 20));
+        request.setGender(Gender.FEMALE);
+        request.setSnils("321-654-987 10");
+        request.setClientUserId(clientUserId);
+
+        mockMvc.perform(post("/api/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.fullName").value("Portal Linked Patient"))
+                .andExpect(jsonPath("$.clientUserId").value(clientUserId));
+    }
+
+    /**
+     * assignDoctor — если у пациента есть clientUser и у врача есть linkedUser,
+     * должна автоматически создаться чат-комната DOCTOR_CLIENT.
+     *
+     * Шаги:
+     *   1. Привязываем doctor1 к его профилю (аналогично MedicalIntegrationTest.setUp).
+     *   2. Создаём пациента с clientUserId=client1.
+     *   3. Назначаем doctor1 этому пациенту.
+     *   4. Проверяем через JdbcTemplate, что комната DOCTOR_CLIENT появилась в БД.
+     */
+    @Test
+    void assignDoctor_whenPatientHasClientAndDoctorHasLinkedUser_chatRoomCreated() throws Exception {
+        // Привязываем doctor1 к профилю врача (могло быть не выполнено при V6-миграции)
+        jdbcTemplate.update(
+                "UPDATE doctor SET user_id = (SELECT id FROM users WHERE username = 'doctor1') " +
+                "WHERE full_name = 'Иванов Сергей Петрович' AND user_id IS NULL");
+
+        Long clientUserId = jdbcTemplate.queryForObject(
+                "SELECT id FROM users WHERE username = 'client1'", Long.class);
+        Long doctorId = jdbcTemplate.queryForObject(
+                "SELECT d.id FROM doctor d JOIN users u ON d.user_id = u.id WHERE u.username = 'doctor1'",
+                Long.class);
+
+        // Создаём пациента, привязанного к client1
+        CreatePatientRequest request = new CreatePatientRequest();
+        request.setFullName("Chat Auto Room Patient");
+        request.setBirthDate(LocalDate.of(1988, 3, 15));
+        request.setGender(Gender.MALE);
+        request.setSnils("987-654-321 00");
+        request.setClientUserId(clientUserId);
+
+        MvcResult createResult = mockMvc.perform(post("/api/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        Long patientId = objectMapper.readTree(createResult.getResponse().getContentAsString())
+                .get("id").asLong();
+
+        // Назначаем врача
+        mockMvc.perform(put("/api/patients/{id}/assign-doctor/{doctorId}", patientId, doctorId))
+                .andExpect(status().isOk());
+
+        // Убеждаемся, что чат-комната DOCTOR_CLIENT создана
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM chat_room WHERE client_user_id = ? AND type = 'DOCTOR_CLIENT'",
+                Integer.class, clientUserId);
+        assertThat(count).isGreaterThan(0);
     }
 }

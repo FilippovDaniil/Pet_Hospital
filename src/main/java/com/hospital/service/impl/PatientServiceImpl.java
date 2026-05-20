@@ -82,6 +82,7 @@ public class PatientServiceImpl implements PatientService {
     private final PatientMapper patientMapper;
     private final PaidServiceMapper paidServiceMapper;
     private final com.hospital.repository.UserRepository userRepository;
+    private final ChatRoomRepository chatRoomRepository;
 
     /**
      * EventPublisher — публикует доменные события (Domain Events).
@@ -306,6 +307,24 @@ public class PatientServiceImpl implements PatientService {
         // setCurrentDoctor устанавливает внешний ключ в таблице patients.
         patient.setCurrentDoctor(doctor);
         patientRepository.save(patient);
+
+        // Шаг 4а: автоматически создаём чат-комнату DOCTOR_CLIENT, если обе стороны
+        // зарегистрированы на порталах (у пациента есть clientUser, у врача — linkedUser).
+        // Паттерн orElseGet: save вызывается только если комнаты ещё нет.
+        if (patient.getClientUser() != null && doctor.getLinkedUser() != null) {
+            User clientUser = patient.getClientUser();
+            User doctorUser = doctor.getLinkedUser();
+            chatRoomRepository
+                .findByTypeAndClientUserIdAndStaffUserId(
+                    ChatRoomType.DOCTOR_CLIENT, clientUser.getId(), doctorUser.getId())
+                .orElseGet(() -> chatRoomRepository.save(
+                    ChatRoom.builder()
+                        .type(ChatRoomType.DOCTOR_CLIENT)
+                        .clientUser(clientUser)
+                        .staffUser(doctorUser)
+                        .build()
+                ));
+        }
 
         // Шаг 5: Открываем новую запись в истории назначений.
         // Builder-паттерн (Lombok @Builder): создаём объект через цепочку .field(value).

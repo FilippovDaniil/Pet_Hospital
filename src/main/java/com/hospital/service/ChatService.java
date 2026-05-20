@@ -56,16 +56,19 @@ public interface ChatService {
     /**
      * Возвращает существующую DOCTOR_CLIENT-комнату для пары клиент–врач или создаёт новую.
      *
-     * <p>Реализует паттерн get-or-create: для каждой уникальной пары (клиент, врач)
-     * существует не более одной комнаты. Если клиент уже переписывался с данным врачом,
-     * возвращается та же комната со всей историей сообщений.
+     * <p>Реализует паттерн get-or-create. Эндпоинт могут вызывать обе стороны:
+     * <ul>
+     *   <li>{@code ROLE_CLIENT} передаёт {@code otherUserId = userId врача}</li>
+     *   <li>{@code ROLE_DOCTOR} передаёт {@code otherUserId = userId клиента}</li>
+     * </ul>
+     * Реализация сама определяет роли по {@code caller.getRole()} и расставляет
+     * clientUser / staffUser корректно независимо от инициатора.
      *
-     * @param client       аутентифицированный пользователь с ролью ROLE_CLIENT
-     * @param doctorUserId идентификатор пользователя-врача (не ID сущности Doctor,
-     *                     а ID учётной записи {@link User})
+     * @param caller      аутентифицированный пользователь (ROLE_CLIENT или ROLE_DOCTOR)
+     * @param otherUserId ID второй стороны: врача (если caller — клиент) или клиента (если caller — врач)
      * @return DTO созданной или существующей DOCTOR_CLIENT-комнаты
      */
-    ChatRoomResponse getOrCreateDoctorRoom(User client, Long doctorUserId);
+    ChatRoomResponse getOrCreateDoctorRoom(User caller, Long otherUserId);
 
     /**
      * Возвращает список всех чат-комнат данного врача с клиентами.

@@ -91,7 +91,12 @@
       "Bash(Write-Output \"Directories created\")",
       "PowerShell(New-Item *)",
       "Bash(Get-ChildItem -Recurse -Filter \"app.js\" -Path \"C:\\\\Users\\\\MaxxPC\\\\IdeaProjects\\\\Pet_Hospital\\\\src\\\\main\\\\resources\\\\static\")",
-      "Bash(Select-Object -First 5)"
+      "Bash(Select-Object -First 5)",
+      "Bash(\"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\" test -Dtest=\"PatientServiceTest,ChatServiceTest\" -pl .)",
+      "Bash(\"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\" test -Dtest=\"PatientServiceTest,WardServiceTest,AdminServiceTest,JwtUtilTest,ChatServiceTest,MedicalServiceTest\" -pl .)",
+      "Bash(\"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\" test -Dtest=\"PatientServiceTest,WardServiceTest,AdminServiceTest,JwtUtilTest,ChatServiceTest,MedicalServiceTest\")",
+      "Bash(\"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\" test -Dtest=\"AuthIntegrationTest,PatientIntegrationTest,ChatIntegrationTest,MedicalIntegrationTest\")",
+      "Bash(\"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\" clean package -DskipTests)"
     ]
   }
 }

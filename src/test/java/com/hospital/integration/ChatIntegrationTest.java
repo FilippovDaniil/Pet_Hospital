@@ -8,6 +8,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
@@ -65,6 +66,9 @@ class ChatIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     // ─── Вспомогательный метод ────────────────────────────────────────────────
 
@@ -338,5 +342,76 @@ class ChatIntegrationTest extends AbstractIntegrationTest {
     void getMyRooms_withoutToken_returns401() throws Exception {
         mockMvc.perform(get("/api/chat/my-rooms"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/chat/doctor/{userId} — двунаправленная инициация чата
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Врач инициирует чат с клиентом через POST /api/chat/doctor/{clientUserId}.
+     * Исправление: до фикса SecurityConfig возвращал 403 для ROLE_DOCTOR.
+     * Теперь разрешено для ROLE_CLIENT и ROLE_DOCTOR.
+     */
+    @Test
+    void getOrCreateDoctorRoom_asDoctor_returns200() throws Exception {
+        String doctorToken = login("doctor1", "doctor123");
+        Long clientUserId = jdbcTemplate.queryForObject(
+                "SELECT id FROM users WHERE username = 'client1'", Long.class);
+
+        mockMvc.perform(post("/api/chat/doctor/{userId}", clientUserId)
+                        .header("Authorization", "Bearer " + doctorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("DOCTOR_CLIENT"));
+    }
+
+    /**
+     * Идемпотентность для врача: два вызова возвращают одну и ту же комнату.
+     * Использует doctor2 + client2, чтобы не пересекаться с другими тестами.
+     */
+    @Test
+    void getOrCreateDoctorRoom_asDoctor_calledTwice_returnsTheSameRoom() throws Exception {
+        // Привязываем doctor2, если не привязан
+        jdbcTemplate.update(
+                "UPDATE doctor SET user_id = (SELECT id FROM users WHERE username = 'doctor2') " +
+                "WHERE full_name = 'Захаров Андрей Михайлович' AND user_id IS NULL");
+
+        String doctorToken = login("doctor2", "doctor123");
+        Long clientUserId = jdbcTemplate.queryForObject(
+                "SELECT id FROM users WHERE username = 'client2'", Long.class);
+
+        MvcResult first = mockMvc.perform(post("/api/chat/doctor/{userId}", clientUserId)
+                        .header("Authorization", "Bearer " + doctorToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        MvcResult second = mockMvc.perform(post("/api/chat/doctor/{userId}", clientUserId)
+                        .header("Authorization", "Bearer " + doctorToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Long firstId  = objectMapper.readTree(first.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .get("id").asLong();
+        Long secondId = objectMapper.readTree(second.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .get("id").asLong();
+        assertThat(firstId).isEqualTo(secondId);
+    }
+
+    /**
+     * Клиент инициирует чат с врачом через POST /api/chat/doctor/{doctorUserId}.
+     * Проверяет, что клиентский путь по-прежнему работает после рефакторинга
+     * под двунаправленность.
+     */
+    @Test
+    void getOrCreateDoctorRoom_asClient_withDoctorUserId_returns200() throws Exception {
+        String clientToken = login("client1", "client123");
+        Long doctorUserId = jdbcTemplate.queryForObject(
+                "SELECT id FROM users WHERE username = 'doctor1'", Long.class);
+
+        mockMvc.perform(post("/api/chat/doctor/{userId}", doctorUserId)
+                        .header("Authorization", "Bearer " + clientToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("DOCTOR_CLIENT"))
+                .andExpect(jsonPath("$.staffUserId").value(doctorUserId));
     }
 }

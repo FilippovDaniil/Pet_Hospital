@@ -168,30 +168,42 @@ public class ChatServiceImpl implements ChatService {
      */
     @Override
     @Transactional
-    public ChatRoomResponse getOrCreateDoctorRoom(User client, Long doctorUserId) {
-        // Загружаем пользователя из БД и одновременно проверяем его роль.
-        // Если пользователь не найден ИЛИ не является врачом — бросаем 404.
-        // Нельзя использовать doctorUser из SecurityContext: нам нужна именно
-        // запись врача, которому пишет клиент, а не текущий аутентифицированный.
-        User doctorUser = userRepository.findById(doctorUserId)
-                .filter(u -> u.getRole() == Role.ROLE_DOCTOR)
-                .orElseThrow(() -> new ResourceNotFoundException("Врач с userId=" + doctorUserId + " не найден"));
+    public ChatRoomResponse getOrCreateDoctorRoom(User caller, Long otherUserId) {
+        // Определяем, кто из двух сторон клиент, а кто врач.
+        // Эндпоинт могут вызывать обе стороны:
+        //   - ROLE_CLIENT вызывает POST /api/chat/doctor/{doctorUserId}   → otherUserId = userId врача
+        //   - ROLE_DOCTOR вызывает POST /api/chat/doctor/{clientUserId}   → otherUserId = userId клиента
+        final User clientUser;
+        final User doctorUser;
+
+        if (caller.getRole() == Role.ROLE_DOCTOR) {
+            // Врач инициирует чат: caller — врач, otherUserId — userId клиента
+            doctorUser = caller;
+            clientUser = userRepository.findById(otherUserId)
+                    .filter(u -> u.getRole() == Role.ROLE_CLIENT)
+                    .orElseThrow(() -> new ResourceNotFoundException("Клиент с userId=" + otherUserId + " не найден"));
+        } else {
+            // Клиент инициирует чат: caller — клиент, otherUserId — userId врача
+            clientUser = caller;
+            doctorUser = userRepository.findById(otherUserId)
+                    .filter(u -> u.getRole() == Role.ROLE_DOCTOR)
+                    .orElseThrow(() -> new ResourceNotFoundException("Врач с userId=" + otherUserId + " не найден"));
+        }
 
         // Ищем существующую комнату для этой пары клиент-врач.
-        // Уникальность на уровне БД должна быть подкреплена UNIQUE-ограничением
-        // (см. V6-миграцию), поэтому findBy... вернёт не более одного результата.
+        // Уникальность на уровне БД подкреплена UNIQUE-ограничением (V6-миграция).
         ChatRoom room = chatRoomRepository
-                .findByTypeAndClientUserIdAndStaffUserId(ChatRoomType.DOCTOR_CLIENT, client.getId(), doctorUserId)
+                .findByTypeAndClientUserIdAndStaffUserId(ChatRoomType.DOCTOR_CLIENT, clientUser.getId(), doctorUser.getId())
                 .orElseGet(() -> chatRoomRepository.save(
                         ChatRoom.builder()
                                 .type(ChatRoomType.DOCTOR_CLIENT)
-                                .clientUser(client)
-                                .staffUser(doctorUser) // врач — вторая сторона комнаты
+                                .clientUser(clientUser)
+                                .staffUser(doctorUser)
                                 .build()
                 ));
 
-        // Счётчик непрочитанных — с точки зрения клиента (он инициатор).
-        return toRoomResponse(room, client.getId());
+        // Счётчик непрочитанных — с точки зрения инициатора вызова.
+        return toRoomResponse(room, caller.getId());
     }
 
     /**
