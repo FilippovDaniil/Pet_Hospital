@@ -1999,7 +1999,8 @@ docker-compose ps
 
 | Интерфейс | URL | Учётные данные |
 |---|---|---|
-| **Web-интерфейс (HIS)** | http://localhost:8090 | admin / admin123 |
+| **Администрация (HIS)** | http://localhost:8090/admin.html | admin / admin123 |
+| **Медсестра (HIS)** | http://localhost:8090/nurse.html | nurse1 / nurse123 |
 | **Портал врача** | http://localhost:8090/doctor.html | doctor1–doctor6 / doctor123 |
 | **Клиентский портал** | http://localhost:8090/client.html | client1 / client123 |
 | **Личный кабинет клиента** | http://localhost:8090/account.html | (через client.html → Кабинет) |
@@ -2073,20 +2074,43 @@ docker-compose down -v
 
 ---
 
-### Первый вход
+### Тестовые учётные данные — все роли
 
-`DataInitializer` создаёт всех пользователей автоматически при первом старте:
+`DataInitializer` создаёт пользователей автоматически при первом старте. `login.html` перенаправляет каждую роль на нужную страницу автоматически.
 
-| Логин | Пароль | Роль | Интерфейс |
+**Персонал больницы:**
+
+| Логин | Пароль | Роль | Страница |
 |---|---|---|---|
-| `admin` | `admin123` | ROLE_ADMIN | http://localhost:8090 |
-| `doctor1` | `doctor123` | ROLE_DOCTOR | http://localhost:8090 |
-| `nurse1` | `nurse123` | ROLE_NURSE | http://localhost:8090 |
+| `admin` | `admin123` | ROLE_ADMIN | http://localhost:8090/admin.html |
+| `nurse1` | `nurse123` | ROLE_NURSE | http://localhost:8090/nurse.html |
+| `doctor1` | `doctor123` | ROLE_DOCTOR | http://localhost:8090/doctor.html |
+| `doctor2` | `doctor123` | ROLE_DOCTOR | http://localhost:8090/doctor.html |
+| `doctor3` | `doctor123` | ROLE_DOCTOR | http://localhost:8090/doctor.html |
+| `doctor4` | `doctor123` | ROLE_DOCTOR | http://localhost:8090/doctor.html |
+| `doctor5` | `doctor123` | ROLE_DOCTOR | http://localhost:8090/doctor.html |
+| `doctor6` | `doctor123` | ROLE_DOCTOR | http://localhost:8090/doctor.html |
+
+**Клиенты портала:**
+
+| Логин | Пароль | Роль | Страница |
+|---|---|---|---|
 | `client1` | `client123` | ROLE_CLIENT | http://localhost:8090/client.html |
 | `client2` | `client123` | ROLE_CLIENT | http://localhost:8090/client.html |
 
-Для создания врача или медсестры — зарегистрироваться через http://localhost:8090/register.html (роль `ROLE_NURSE`).
-Для регистрации нового клиента — через http://localhost:8090/client.html → "Зарегистрироваться" (роль `ROLE_CLIENT`).
+**Соответствие врачей и записей в БД:**
+
+| Логин | ФИО врача |
+|---|---|
+| `doctor1` | Иванов Сергей Петрович |
+| `doctor2` | Захаров Андрей Михайлович |
+| `doctor3` | Беляев Константин Семёнович |
+| `doctor4` | Романова Анна Викторовна |
+| `doctor5` | Тарасова Людмила Витальевна |
+| `doctor6` | Федосеев Алексей Владимирович |
+
+Для регистрации нового сотрудника — http://localhost:8090/register.html (роль `ROLE_NURSE`).
+Для регистрации нового клиента — http://localhost:8090/client.html → «Зарегистрироваться» (роль `ROLE_CLIENT`).
 
 **Получить JWT-токен через curl:**
 ```bash
@@ -2235,10 +2259,12 @@ spring:
 
 | Файл | Роль | Описание |
 |---|---|---|
-| `index.html` + `app.js` | `ROLE_ADMIN`, `ROLE_NURSE` | HIS: пациенты, врачи, отделения, палаты, чаты |
-| `doctor.html` | `ROLE_DOCTOR` | Портал врача: мои пациенты, история болезни, заметки, документы, чаты с пациентами |
+| `admin.html` + `app.js` | `ROLE_ADMIN` | HIS: пациенты, врачи, отделения, палаты, чаты, отчёты, выписка |
+| `nurse.html` | `ROLE_NURSE` | HIS (урезанный): пациенты (без удаления), палаты, услуги — без отчётов и управления врачами |
+| `doctor.html` | `ROLE_DOCTOR` | Портал врача: мои пациенты, приёмы (+ зачисление в HIS), история болезни, заметки, документы, чаты |
 | `client.html` | Все / `ROLE_CLIENT` | Лендинг клиентского портала: врачи, услуги, отделения |
 | `account.html` | `ROLE_CLIENT` | Личный кабинет: мои записи, заказы, документы, история, чат поддержки, чат с врачом |
+| `index.html` + `app.js` | (legacy) | Обратная совместимость — перенаправляет на admin.html/nurse.html |
 
 ### Матрица доступа (index.html / app.js)
 
@@ -2486,12 +2512,7 @@ PostgreSQL              v
 | `client.html` | `/client.html` | Публичный лендинг: врачи, услуги, отделения. Кнопка «Кабинет» ведёт на `account.html` |
 | `account.html` | `/account.html` | Личный кабинет: полный функционал зарегистрированного клиента |
 
-### Учётные данные (тестовые)
-
-| Логин | Пароль | Описание |
-|---|---|---|
-| `client1` | `client123` | Тестовый клиент «Иван» |
-| `client2` | `client123` | Тестовый клиент «Мария» |
+Учётные данные: client1 / client123, client2 / client123. Полный список: [Тестовые учётные данные](#тестовые-учётные-данные--все-роли) в разделе 23.
 
 Зарегистрировать нового клиента: кнопка «Зарегистрироваться» на портале, или `POST /api/auth/register-client`.
 
@@ -2774,18 +2795,9 @@ patient ──── (1:N) ──── medical_document ←── doctor (issue
 
 **URL:** `http://localhost:8090/doctor.html`
 
-### Учётные данные
+Учётные данные врачей — doctor1–doctor6 / doctor123. Полный список с ФИО: [Тестовые учётные данные](#тестовые-учётные-данные--все-роли) в разделе 23.
 
-| Логин | Пароль | Врач |
-|---|---|---|
-| `doctor1` | `doctor123` | Иванов Сергей Петрович |
-| `doctor2` | `doctor123` | Захаров Андрей Михайлович |
-| `doctor3` | `doctor123` | Беляев Константин Семёнович |
-| `doctor4` | `doctor123` | Романова Анна Викторовна |
-| `doctor5` | `doctor123` | Тарасова Людмила Витальевна |
-| `doctor6` | `doctor123` | Федосеев Алексей Владимирович |
-
-Логин через стандартную страницу `/login.html` (общий JWT-токен в `localStorage.token`).
+Логин через `/login.html` — автоматически перенаправляет на `/doctor.html` для роли `ROLE_DOCTOR`.
 
 ### Инициализация сессии
 
@@ -2801,6 +2813,7 @@ GET /api/doctors/me  →  DoctorResponse
 |---|---|---|
 | Dashboard | `GET /api/patients`, `GET /api/chat/doctor/rooms` | Статистика + последние пациенты и чаты |
 | Мои пациенты | `GET /api/patients?doctorId={id}` | Карточки пациентов с поиском и фильтром статуса |
+| Приёмы | `GET /api/client/appointments/my` (по doctorId) | Записи клиентов к этому врачу. Кнопка «+ В пациенты» — зачислить клиента как HIS-пациента |
 | Чаты | `GET /api/chat/doctor/rooms` + polling | Все чаты врача с клиентами |
 
 ### Панель деталей пациента

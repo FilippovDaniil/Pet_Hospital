@@ -245,6 +245,9 @@ select.form-control { cursor:pointer; }
   .summary-grid { grid-template-columns:1fr 1fr; }
 }
 </style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
 </head>
 <body>
 
@@ -424,8 +427,7 @@ select.form-control { cursor:pointer; }
           <select class="form-control" id="book-doctor" required><option value="">— Выберите врача —</option></select>
         </div>
         <div class="form-group"><label class="form-label">Желаемая дата</label>
-          <input class="form-control" type="date" id="book-date" required onchange="checkBookDateWeekend()">
-          <div id="book-date-warn" style="display:none;color:#d97706;font-size:0.8rem;margin-top:4px"></div>
+          <input class="form-control" type="text" id="book-date" required placeholder="Выберите дату (пн–пт)" readonly>
         </div>
         <div class="form-group"><label class="form-label">Удобное время</label>
           <select class="form-control" id="book-time">
@@ -472,7 +474,7 @@ let allDoctors = [];
 let allServices = [];
 
 window.addEventListener('DOMContentLoaded', () => {
-  setMinDate();
+  initBookDatePicker();
   loadDoctors();
   loadServices();
   loadDepartments();
@@ -482,32 +484,22 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-function setMinDate() {
-  const t = new Date(); t.setDate(t.getDate() + 1);
-  document.getElementById('book-date').min = t.toISOString().slice(0, 10);
+function initBookDatePicker() {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  flatpickr('#book-date', {
+    minDate: tomorrow,
+    disable: [function(date) { return date.getDay() === 0 || date.getDay() === 6; }],
+    locale: 'ru',
+    dateFormat: 'Y-m-d',
+    disableMobile: true
+  });
 }
 
 function isWeekend(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   const day = new Date(y, m - 1, d).getDay();
   return day === 0 || day === 6;
-}
-
-function checkBookDateWeekend() {
-  const input = document.getElementById('book-date');
-  const warn = document.getElementById('book-date-warn');
-  if (!input.value) { warn.style.display = 'none'; return; }
-  const [y, m, d] = input.value.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  const day = date.getDay();
-  if (day === 6) date.setDate(date.getDate() + 2); // суббота → понедельник
-  if (day === 0) date.setDate(date.getDate() + 1); // воскресенье → понедельник
-  if (day === 0 || day === 6) {
-    input.value = date.toISOString().slice(0, 10);
-    warn.textContent = 'Врачи отдыхают в выходные. Дата перенесена на ближайший понедельник.';
-    warn.style.display = 'block';
-    setTimeout(() => { warn.style.display = 'none'; }, 3500);
-  }
 }
 
 function scrollToId(id) { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); }

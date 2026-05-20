@@ -165,9 +165,19 @@
 </div>
 
 <script>
+  function roleToPath(role) {
+    switch (role) {
+      case 'ROLE_ADMIN':  return '/admin.html';
+      case 'ROLE_DOCTOR': return '/doctor.html';
+      case 'ROLE_NURSE':  return '/nurse.html';
+      case 'ROLE_CLIENT': return '/client.html';
+      default:            return '/index.html';
+    }
+  }
+
   // Redirect if already logged in
   if (localStorage.getItem('token')) {
-    window.location.href = '/index.html';
+    window.location.href = roleToPath(localStorage.getItem('role'));
   }
 
   document.addEventListener('keydown', e => {
@@ -207,7 +217,7 @@
       localStorage.setItem('username', data.username);
       localStorage.setItem('fullName', data.fullName || data.username);
       localStorage.setItem('role',     data.role);
-      window.location.href = '/index.html';
+      window.location.href = roleToPath(data.role);
     } catch (e) {
       showError('Ошибка соединения с сервером');
     } finally {

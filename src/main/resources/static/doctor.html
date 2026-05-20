@@ -376,6 +376,45 @@ textarea.form-control{resize:vertical;min-height:80px}
   </div>
 </div>
 
+<!-- ════ REGISTER AS PATIENT MODAL ════ -->
+<div id="reg-modal" onclick="if(event.target===this)closeRegisterModal()"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;padding:28px;width:480px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <h2 style="font-size:1rem;font-weight:700;color:var(--text)">Зачислить клиента в пациенты</h2>
+      <button onclick="closeRegisterModal()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--muted);line-height:1">✕</button>
+    </div>
+    <input type="hidden" id="reg-clientUserId">
+    <div class="form-group">
+      <label class="form-label">ФИО</label>
+      <input class="form-control" id="reg-fullName" readonly style="background:var(--bg);color:var(--muted)">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Дата рождения *</label>
+        <input type="date" class="form-control" id="reg-birthDate">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Пол *</label>
+        <select class="form-control" id="reg-gender">
+          <option value="MALE">Мужской</option>
+          <option value="FEMALE">Женский</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">СНИЛС * (формат: 123-456-789 00)</label>
+      <input class="form-control" id="reg-snils" placeholder="123-456-789 00">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Телефон</label>
+      <input class="form-control" id="reg-phone" placeholder="+7-900-000-0000">
+    </div>
+    <p style="font-size:.78rem;color:var(--muted);margin:0 0 16px">Пациент будет автоматически назначен вам как лечащий врач.</p>
+    <button class="form-submit" onclick="saveRegisteredPatient()">Зачислить в пациенты</button>
+  </div>
+</div>
+
 <div class="toast-container" id="toasts"></div>
 
 <script>
@@ -389,8 +428,9 @@ let activePanelPatientId = null;
 let activePanelTab = 'history';
 let chatRoomId = null, chatLastId = 0, chatTimer = null;
 
-// ── Guard ──
-if (!token) { window.location.href = '/login.html'; }
+// ── Guard: ROLE_DOCTOR only ──
+const _role = localStorage.getItem('role');
+if (!token || _role !== 'ROLE_DOCTOR') { window.location.href = '/login.html'; }
 
 window.addEventListener('DOMContentLoaded', init);
 
@@ -832,7 +872,11 @@ function renderAppointments(list) {
         </div>
         ${a.notes?`<div class="appt-notes">"${esc(a.notes)}"</div>`:''}
       </div>
-      ${a.clientUserId?`<button class="btn btn-outline btn-sm" onclick="openChatWithClient(${a.clientUserId})">💬 Чат</button>`:''}
+      ${a.clientUserId?`
+        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+          <button class="btn btn-outline btn-sm" onclick="openChatWithClient(${a.clientUserId})">💬 Чат</button>
+          <button class="btn btn-green btn-sm" onclick="openRegisterPatientModal(${a.clientUserId},'${escQ(a.clientName||'')}')">+ В пациенты</button>
+        </div>`:''}
     </div>`;
   }).join('');
 }
@@ -992,6 +1036,49 @@ function toast(msg, type='info') {
   el.textContent = msg;
   document.getElementById('toasts').appendChild(el);
   setTimeout(() => el.remove(), 4000);
+}
+
+// ── Register client as HIS patient ──
+function openRegisterPatientModal(clientUserId, clientName) {
+  document.getElementById('reg-clientUserId').value = clientUserId;
+  document.getElementById('reg-fullName').value = clientName;
+  document.getElementById('reg-birthDate').value = '';
+  document.getElementById('reg-snils').value = '';
+  document.getElementById('reg-phone').value = '';
+  document.getElementById('reg-gender').value = 'MALE';
+  document.getElementById('reg-modal').style.display = 'flex';
+}
+
+function closeRegisterModal() {
+  document.getElementById('reg-modal').style.display = 'none';
+}
+
+async function saveRegisteredPatient() {
+  const clientUserId = Number(document.getElementById('reg-clientUserId').value);
+  const fullName  = document.getElementById('reg-fullName').value.trim();
+  const birthDate = document.getElementById('reg-birthDate').value;
+  const gender    = document.getElementById('reg-gender').value;
+  const snils     = document.getElementById('reg-snils').value.trim();
+  const phone     = document.getElementById('reg-phone').value.trim();
+
+  if (!birthDate) { toast('Укажите дату рождения', 'warning'); return; }
+  if (!snils)     { toast('Укажите СНИЛС', 'warning'); return; }
+
+  try {
+    const patient = await api('/api/patients', 'POST', {
+      fullName, birthDate, gender, snils,
+      phone: phone || null,
+      clientUserId,
+    });
+    if (myDoctor?.id) {
+      await api(`/api/patients/${patient.id}/assign-doctor/${myDoctor.id}`, 'PUT');
+    }
+    toast('Пациент зачислен и назначен вам', 'success');
+    closeRegisterModal();
+    navigate('patients');
+  } catch(e) {
+    toast(e.message || 'Ошибка создания пациента', 'error');
+  }
 }
 </script>
 </body>

@@ -13,7 +13,8 @@ docker-compose up -d --build app  # пересобрать после измен
 
 | Интерфейс | URL | Логин / Пароль |
 |---|---|---|
-| HIS (персонал) | http://localhost:8090 | admin / admin123 |
+| Администрация (HIS) | http://localhost:8090/admin.html | admin / admin123 |
+| Медсестра (HIS) | http://localhost:8090/nurse.html | nurse1 / nurse123 |
 | Портал врача | http://localhost:8090/doctor.html | doctor1–doctor6 / doctor123 |
 | Клиентский портал | http://localhost:8090/client.html | client1 / client123 |
 | Личный кабинет клиента | http://localhost:8090/account.html | (через client.html → Кабинет) |
@@ -123,7 +124,9 @@ src/main/resources/
 │   └── V7__link_doctor_users.sql   # fallback-линковка doctor2–doctor6 → users (идемпотентно)
 ├── logback-spring.xml              # loki4j appender (async)
 └── static/
-    ├── index.html                  # HIS SPA (ROLE_ADMIN, ROLE_NURSE)
+    ├── index.html                  # legacy HIS SPA (обратная совместимость)
+    ├── admin.html                  # HIS для ROLE_ADMIN (role guard + app.js)
+    ├── nurse.html                  # HIS для ROLE_NURSE (standalone, без app.js)
     ├── app.js                      # SECTION_ACCESS, loadChats, openPatientHistoryModal
     ├── client.html                 # Клиентский портал (лендинг, ROLE_CLIENT/public)
     ├── account.html                # Личный кабинет клиента (ROLE_CLIENT, auth guard)
@@ -151,9 +154,9 @@ src/main/resources/
 
 | Роль | Интерфейс | API-префикс |
 |---|---|---|
-| `ROLE_ADMIN` | index.html | `/api/admin/**`, `GET /api/chat/support`, все остальные |
+| `ROLE_ADMIN` | admin.html | `/api/admin/**`, `GET /api/chat/support`, все остальные |
 | `ROLE_DOCTOR` | doctor.html | `/api/patients/**`, `/api/doctors/**`, `/api/doctors/me`, `/api/medical/**` (write/read), `GET /api/chat/doctor/rooms` |
-| `ROLE_NURSE` | index.html | `/api/patients/**` (ограниченно) |
+| `ROLE_NURSE` | nurse.html | `/api/patients/**` (ограниченно) |
 | `ROLE_CLIENT` | client.html + account.html | `/api/client/**`, `POST /api/chat/support`, `POST /api/chat/doctor/**`, `GET /api/chat/my-rooms`, `GET /api/medical/documents/my`, `GET /api/medical/history/my` |
 
 Публичный доступ без токена:
@@ -261,6 +264,24 @@ jdbcTemplate.update(
     "UPDATE doctor SET user_id = (SELECT id FROM users WHERE username = 'doctor1') " +
     "WHERE full_name = 'Иванов Сергей Петрович'");
 ```
+
+### login.html — role-based routing
+
+`login.html` использует `roleToPath(role)` для редиректа по роли:
+- `ROLE_ADMIN` → `/admin.html`
+- `ROLE_DOCTOR` → `/doctor.html`
+- `ROLE_NURSE` → `/nurse.html`
+- `ROLE_CLIENT` → `/client.html`
+
+Применяется как при уже активном токене (проверка при загрузке), так и после успешного логина.
+
+### CreatePatientRequest / PatientResponse — clientUserId
+
+`CreatePatientRequest` содержит необязательное поле `private Long clientUserId` — для привязки нового HIS-пациента к существующей учётной записи клиентского портала.
+
+`PatientResponse` содержит `private Long clientUserId` (маппинг через `@Mapping(target="clientUserId", source="clientUser.id")`).
+
+Используется в doctor.html: вкладка «Чат» проверяет `patient.clientUserId != null`. Кнопка «+ В пациенты» в секции «Приёмы» передаёт `clientUserId` при регистрации.
 
 ### Java 17 vs Java 21
 
@@ -450,6 +471,7 @@ POST /api/chat/doctor/{doctorUserId}
   - Добавить заметку: `POST /api/medical/notes` (type, content, visibleToClient)
   - Добавить документ: `POST /api/medical/documents` (type, title, content, validUntil)
   - Чат: `GET /api/patients/{id}` → `clientUserId` → `POST /api/chat/doctor/{clientUserId}`
+- **Приёмы**: записи клиентского портала к этому врачу. Кнопка «+ В пациенты» открывает модалку регистрации пациента в HIS с предзаполненным именем и автоматической привязкой `clientUserId` + назначением врача.
 - **Чаты**: двухколоночный интерфейс (список комнат + переписка, short-polling 3с)
 
 ### GET /api/doctors/me

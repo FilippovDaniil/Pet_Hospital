@@ -90,4 +90,7 @@ public class CreatePatientRequest {
      * Не имеет ограничений Bean Validation — любая строка допустима.
      */
     private String address;
+
+    /** ID пользователя клиентского портала для привязки пациента к учётной записи. Необязательное поле. */
+    private Long clientUserId;
 }

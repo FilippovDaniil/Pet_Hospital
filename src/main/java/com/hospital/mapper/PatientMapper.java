@@ -54,6 +54,7 @@ public interface PatientMapper {
     @Mapping(target = "currentDoctor", ignore = true)
     @Mapping(target = "currentWard", ignore = true)
     @Mapping(target = "active", ignore = true)
+    @Mapping(target = "clientUser", ignore = true)
     Patient toEntity(CreatePatientRequest request);
 
     /**
@@ -78,10 +79,11 @@ public interface PatientMapper {
      * @param patient JPA-сущность из базы данных
      * @return PatientResponse — плоский DTO для JSON-ответа (без вложенных объектов)
      */
-    @Mapping(target = "currentDoctorId", source = "currentDoctor.id")
+    @Mapping(target = "currentDoctorId",   source = "currentDoctor.id")
     @Mapping(target = "currentDoctorName", source = "currentDoctor.fullName")
-    @Mapping(target = "currentWardId", source = "currentWard.id")
+    @Mapping(target = "currentWardId",     source = "currentWard.id")
     @Mapping(target = "currentWardNumber", source = "currentWard.wardNumber")
+    @Mapping(target = "clientUserId",      source = "clientUser.id")
     PatientResponse toResponse(Patient patient);
 
     /**

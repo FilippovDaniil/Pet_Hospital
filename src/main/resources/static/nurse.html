@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Портал медсестры — Больница</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+<div class="layout">
+
+  <!-- ========== SIDEBAR ========== -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span class="logo-icon">🏥</span>
+      <span>Больница ИС</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Обзор</div>
+      <a href="#" data-nav="dashboard" onclick="navigate('dashboard');return false">
+        <i class="fa fa-gauge-high"></i><span>Дашборд</span>
+      </a>
+
+      <div class="nav-section-title">Управление</div>
+      <a href="#" data-nav="patients" onclick="navigate('patients');return false">
+        <i class="fa fa-users"></i><span>Пациенты</span>
+      </a>
+      <a href="#" data-nav="wards" onclick="navigate('wards');return false">
+        <i class="fa fa-bed"></i><span>Палаты</span>
+      </a>
+      <a href="#" data-nav="services" onclick="navigate('services');return false">
+        <i class="fa fa-file-invoice-dollar"></i><span>Услуги</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">Pet Hospital HIS v1.0</div>
+  </aside>
+
+  <!-- ========== MAIN CONTENT ========== -->
+  <main class="main-content">
+
+    <div class="topbar">
+      <span class="topbar-title" id="topbarTitle">Дашборд</span>
+      <div class="topbar-right">
+        <span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:.75rem">Медсестра</span>
+        <span id="user-name" style="font-size:.88rem;color:#475569;font-weight:500"></span>
+        <button class="btn btn-outline btn-sm" onclick="logout()">
+          <i class="fa fa-right-from-bracket"></i> Выход
+        </button>
+      </div>
+    </div>
+
+    <div class="page-content">
+
+      <!-- ======== DASHBOARD ======== -->
+      <div id="page-dashboard" class="section-page">
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-icon blue"><i class="fa fa-users"></i></div>
+            <div><div class="stat-value" id="stat-patients">…</div><div class="stat-label">Пациентов</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon orange"><i class="fa fa-bed"></i></div>
+            <div><div class="stat-value" id="stat-wards">…</div><div class="stat-label">Палат</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon teal"><i class="fa fa-door-open"></i></div>
+            <div><div class="stat-value" id="stat-free">…</div><div class="stat-label">Свободных мест</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><i class="fa fa-clock-rotate-left"></i> Последние пациенты</div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrapper">
+              <table>
+                <thead><tr><th>ФИО</th><th>Статус</th><th>Врач</th><th>Палата</th></tr></thead>
+                <tbody id="recent-patients">
+                  <tr><td colspan="4" style="text-align:center;padding:20px"><div class="spinner"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======== PATIENTS ======== -->
+      <div id="page-patients" class="section-page">
+        <div class="card">
+          <div class="card-header">
+            <i class="fa fa-users"></i> Пациенты
+            <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <input id="patient-search" class="form-control" style="width:200px;padding:5px 8px;font-size:.82rem"
+                     placeholder="Поиск по ФИО..." oninput="debouncedSearch()" />
+              <select id="patient-status-filter" class="form-control" style="width:160px;padding:5px 8px;font-size:.82rem"
+                      onchange="debouncedSearch()">
+                <option value="">Все статусы</option>
+                <option value="TREATMENT">На лечении</option>
+                <option value="DISCHARGED">Выписан</option>
+                <option value="TRANSFERRED">Переведён</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr><th>#</th><th>ФИО</th><th>СНИЛС</th><th>Статус</th><th>Врач</th><th>Палата</th></tr>
+                </thead>
+                <tbody id="patients-table">
+                  <tr><td colspan="6" style="text-align:center;padding:24px"><div class="spinner"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination" id="patients-pagination" style="padding:0 16px 12px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======== WARDS ======== -->
+      <div id="page-wards" class="section-page">
+        <div class="card">
+          <div class="card-header">
+            <i class="fa fa-bed"></i> Палаты
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrapper">
+              <table>
+                <thead><tr><th>#</th><th>Номер</th><th>Отделение</th><th>Заполненность</th><th>Действия</th></tr></thead>
+                <tbody id="wards-table">
+                  <tr><td colspan="5" style="text-align:center;padding:24px"><div class="spinner"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======== SERVICES ======== -->
+      <div id="page-services" class="section-page">
+        <div class="card">
+          <div class="card-header">
+            <i class="fa fa-file-invoice-dollar"></i> Платные услуги
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrapper">
+              <table>
+                <thead><tr><th>#</th><th>Название</th><th>Цена</th><th>Статус</th></tr></thead>
+                <tbody id="services-table">
+                  <tr><td colspan="4" style="text-align:center;padding:24px"><div class="spinner"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination" id="services-pagination" style="padding:0 16px 12px"></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /page-content -->
+  </main>
+</div><!-- /layout -->
+
+<!-- Admit Patient to Ward -->
+<div class="modal-overlay" id="modal-admit">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Заселить в палату</span>
+      <button class="modal-close" onclick="closeModal('modal-admit')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="admit-wardId" />
+      <p id="admit-wardLabel" style="font-weight:600;color:#1a6fc4;margin-top:0"></p>
+      <div class="form-group">
+        <label class="form-label">Выберите пациента</label>
+        <select id="admit-patientId" class="form-control"></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-admit')">Отмена</button>
+      <button class="btn btn-primary" onclick="doAdmit()">Заселить</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+'use strict';
+
+// ── Role guard: ROLE_NURSE only ──
+(function() {
+  const t = localStorage.getItem('token');
+  const r = localStorage.getItem('role');
+  if (!t || r !== 'ROLE_NURSE') window.location.href = '/login.html';
+})();
+
+const API = '';
+let currentSection = 'dashboard';
+let patientsPage = 0;
+let servicesPage = 0;
+
+document.addEventListener('DOMContentLoaded', () => {
+  const name = localStorage.getItem('fullName') || localStorage.getItem('username') || '';
+  document.getElementById('user-name').textContent = name;
+  navigate('dashboard');
+});
+
+// ── Navigation ──
+function navigate(section) {
+  document.querySelectorAll('.section-page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
+  const page = document.getElementById('page-' + section);
+  if (page) page.classList.add('active');
+  const link = document.querySelector(`[data-nav="${section}"]`);
+  if (link) link.classList.add('active');
+  document.getElementById('topbarTitle').textContent = {
+    dashboard: 'Дашборд', patients: 'Пациенты', wards: 'Палаты', services: 'Платные услуги'
+  }[section] || section;
+  currentSection = section;
+  if (section === 'dashboard') loadDashboard();
+  if (section === 'patients')  loadPatients(0);
+  if (section === 'wards')     loadWards();
+  if (section === 'services')  loadServices(0);
+}
+
+// ── Modal helpers ──
+function openModal(id)  { document.getElementById(id)?.classList.add('open'); }
+function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
+
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
+});
+
+// ── Utils ──
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : '⚠';
+  el.innerHTML = `<span>${icon}</span><span>${msg}</span>`;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+async function apiFetch(path, options = {}) {
+  const token = localStorage.getItem('token');
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  try {
+    const res = await fetch(API + path, { headers, ...options });
+    if (res.status === 401) { localStorage.clear(); window.location.href = '/login.html'; throw new Error('Unauthorized'); }
+    if (res.status === 204) return null;
+    const data = await res.json();
+    if (!res.ok) { const msg = data.message || 'Server error'; toast(msg, 'error'); throw new Error(msg); }
+    return data;
+  } catch(e) {
+    if (!(e instanceof Error && e.message === 'Unauthorized')) toast(e.toString(), 'error');
+    throw e;
+  }
+}
+
+function logout() { localStorage.clear(); window.location.href = '/login.html'; }
+
+function escHtml(s) { return s == null ? '—' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function statusBadge(s) {
+  const map = {
+    TREATMENT:  ['badge-treatment',  'На лечении'],
+    DISCHARGED: ['badge-discharged', 'Выписан'],
+    TRANSFERRED:['badge-transferred','Переведён'],
+  };
+  const [cls, label] = map[s] || ['', s];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function activeBadge(a) {
+  return a
+    ? `<span class="badge badge-active">Активна</span>`
+    : `<span class="badge badge-inactive">Неактивна</span>`;
+}
+
+function occupancyBar(occ, cap) {
+  const pct = cap ? Math.round((occ / cap) * 100) : 0;
+  const cls = pct < 60 ? 'occ-low' : pct < 90 ? 'occ-mid' : 'occ-high';
+  return `
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="occ-bar"><div class="occ-bar-fill ${cls}" style="width:${pct}%"></div></div>
+      <small>${occ}/${cap}</small>
+    </div>`;
+}
+
+function buildPagination(containerId, data, onPageFn) {
+  const c = document.getElementById(containerId);
+  if (!c) return;
+  if (data.totalPages <= 1) { c.innerHTML = ''; return; }
+  let html = `<button ${data.page === 0 ? 'disabled' : ''} onclick="${onPageFn}(${data.page - 1})">‹</button>`;
+  for (let i = 0; i < data.totalPages; i++) {
+    html += `<button class="${i === data.page ? 'active' : ''}" onclick="${onPageFn}(${i})">${i + 1}</button>`;
+  }
+  html += `<button ${data.last ? 'disabled' : ''} onclick="${onPageFn}(${data.page + 1})">›</button>`;
+  c.innerHTML = html;
+}
+
+// ── Dashboard ──
+async function loadDashboard() {
+  try {
+    const [patients, wards] = await Promise.all([
+      apiFetch('/api/patients?size=1'),
+      apiFetch('/api/wards'),
+    ]);
+    const totalCap = wards.reduce((s, w) => s + w.capacity, 0);
+    const totalOcc = wards.reduce((s, w) => s + w.currentOccupancy, 0);
+    document.getElementById('stat-patients').textContent = patients.totalElements ?? '—';
+    document.getElementById('stat-wards').textContent    = wards.length ?? '—';
+    document.getElementById('stat-free').textContent     = (totalCap - totalOcc) + ' / ' + totalCap;
+
+    const recent = await apiFetch('/api/patients?size=5&page=0');
+    document.getElementById('recent-patients').innerHTML = recent.content.length === 0
+      ? '<tr><td colspan="4" class="empty-state">Нет пациентов</td></tr>'
+      : recent.content.map(p => `
+          <tr>
+            <td>${escHtml(p.fullName)}</td>
+            <td>${statusBadge(p.status)}</td>
+            <td>${escHtml(p.currentDoctorName)}</td>
+            <td>${escHtml(p.currentWardNumber)}</td>
+          </tr>`).join('');
+  } catch (_) {}
+}
+
+// ── Patients ──
+let searchTimer = null;
+function debouncedSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => loadPatients(0), 300);
+}
+
+async function loadPatients(page = 0) {
+  patientsPage = page;
+  const q      = document.getElementById('patient-search')?.value?.trim() || '';
+  const status = document.getElementById('patient-status-filter')?.value  || '';
+  let data;
+  if (q || status) {
+    const params = new URLSearchParams({ page, size: 15 });
+    if (q)      params.append('q', q);
+    if (status) params.append('status', status);
+    data = await apiFetch('/api/patients/search?' + params);
+  } else {
+    data = await apiFetch(`/api/patients?page=${page}&size=15`);
+  }
+  if (!data) return;
+
+  document.getElementById('patients-table').innerHTML = data.content.length === 0
+    ? `<tr><td colspan="6" style="text-align:center;padding:24px">Пациентов не найдено</td></tr>`
+    : data.content.map(p => `
+        <tr>
+          <td><strong>#${p.id}</strong></td>
+          <td>${escHtml(p.fullName)}</td>
+          <td>${escHtml(p.snils)}</td>
+          <td>${statusBadge(p.status)}</td>
+          <td>${escHtml(p.currentDoctorName)}</td>
+          <td>${escHtml(p.currentWardNumber)}</td>
+        </tr>`).join('');
+
+  buildPagination('patients-pagination', data, 'loadPatients');
+}
+
+window.loadPatients = loadPatients;
+
+// ── Wards ──
+async function loadWards() {
+  const data = await apiFetch('/api/wards');
+  if (!data) return;
+
+  document.getElementById('wards-table').innerHTML = data.length === 0
+    ? `<tr><td colspan="5" style="text-align:center;padding:24px">Палат нет</td></tr>`
+    : data.map(w => `
+        <tr>
+          <td><strong>#${w.id}</strong></td>
+          <td>${escHtml(w.wardNumber)}</td>
+          <td>${escHtml(w.departmentName)}</td>
+          <td>${occupancyBar(w.currentOccupancy, w.capacity)}</td>
+          <td>
+            <button class="btn btn-primary btn-sm" onclick="openAdmitModal(${w.id},'${escHtml(w.wardNumber)}',${w.freeSlots})">
+              + Заселить
+            </button>
+          </td>
+        </tr>`).join('');
+}
+
+async function openAdmitModal(wardId, wardNumber, freeSlots) {
+  if (freeSlots === 0) { toast('В палате нет свободных мест', 'warning'); return; }
+  document.getElementById('admit-wardId').value = wardId;
+  document.getElementById('admit-wardLabel').textContent = `Палата ${wardNumber} (свободно: ${freeSlots})`;
+  const patients = await apiFetch('/api/patients?size=100');
+  if (!patients) return;
+  const unassigned = patients.content.filter(p => p.status === 'TREATMENT' && !p.currentWardNumber);
+  document.getElementById('admit-patientId').innerHTML = unassigned.length === 0
+    ? `<option value="">Нет доступных пациентов</option>`
+    : unassigned.map(p => `<option value="${p.id}">${escHtml(p.fullName)}</option>`).join('');
+  openModal('modal-admit');
+}
+
+async function doAdmit() {
+  const wardId    = document.getElementById('admit-wardId').value;
+  const patientId = document.getElementById('admit-patientId').value;
+  if (!patientId) { toast('Выберите пациента', 'warning'); return; }
+  try {
+    await apiFetch(`/api/wards/${wardId}/admit/${patientId}`, { method: 'POST' });
+    toast('Пациент заселён');
+    closeModal('modal-admit');
+    loadWards();
+  } catch (_) {}
+}
+
+// ── Services ──
+async function loadServices(page = 0) {
+  servicesPage = page;
+  const data = await apiFetch(`/api/paid-services?page=${page}&size=15`);
+  if (!data) return;
+
+  document.getElementById('services-table').innerHTML = data.content.length === 0
+    ? `<tr><td colspan="4" style="text-align:center;padding:24px">Услуг нет</td></tr>`
+    : data.content.map(s => `
+        <tr>
+          <td><strong>#${s.id}</strong></td>
+          <td>${escHtml(s.name)}</td>
+          <td><strong>${s.price} ₽</strong></td>
+          <td>${activeBadge(s.active)}</td>
+        </tr>`).join('');
+
+  buildPagination('services-pagination', data, 'loadServices');
+}
+
+window.loadServices = loadServices;
+</script>
+</body>
+</html>

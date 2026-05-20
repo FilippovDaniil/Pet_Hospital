@@ -81,6 +81,7 @@ public class PatientServiceImpl implements PatientService {
     // Это разделение слоёв: контроллер получает DTO, база данных — сущности.
     private final PatientMapper patientMapper;
     private final PaidServiceMapper paidServiceMapper;
+    private final com.hospital.repository.UserRepository userRepository;
 
     /**
      * EventPublisher — публикует доменные события (Domain Events).
@@ -132,6 +133,12 @@ public class PatientServiceImpl implements PatientService {
         patient.setActive(true);
 
         // Сохраняем в базу данных. JPA выполнит INSERT и вернёт сущность с заполненным ID.
+        if (request.getClientUserId() != null) {
+            com.hospital.entity.User clientUser = userRepository.findById(request.getClientUserId())
+                    .orElseThrow(() -> new ResourceNotFoundException("User", request.getClientUserId()));
+            patient.setClientUser(clientUser);
+        }
+
         Patient saved = patientRepository.save(patient);
         log.info("Created patient id={}", saved.getId());
 

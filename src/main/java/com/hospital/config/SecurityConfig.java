@@ -147,7 +147,7 @@ public class SecurityConfig {
                  * выполняется через JavaScript, который уже получает токен от /api/auth/login.
                  */
                 .requestMatchers("/", "/index.html", "/login.html", "/register.html", "/client.html",
-                                 "/account.html", "/doctor.html",
+                                 "/account.html", "/doctor.html", "/admin.html", "/nurse.html",
                                  "/css/**", "/js/**", "/favicon.ico").permitAll()
 
                 // Публичные GET-эндпоинты пациентского портала (просмотр без авторизации)
