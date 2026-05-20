@@ -84,7 +84,12 @@
       "PowerShell($mvn = \"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\"; cd \"C:\\\\Users\\\\MaxxPC\\\\IdeaProjects\\\\Pet_Hospital\"; & $mvn test \"-Dtest=AuthIntegrationTest,PatientIntegrationTest,ChatIntegrationTest,MedicalIntegrationTest\" \"--no-transfer-progress\" 2>&1 | Select-Object -Last 30)",
       "PowerShell($mvn = \"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\"; cd \"C:\\\\Users\\\\MaxxPC\\\\IdeaProjects\\\\Pet_Hospital\"; & $mvn test \"--no-transfer-progress\" 2>&1 | Select-Object -Last 20)",
       "PowerShell(Get-Content *)",
-      "PowerShell($lines = \\(Get-Content \"C:\\\\Users\\\\MaxxPC\\\\IdeaProjects\\\\Pet_Hospital\\\\README.md\"\\).Count; Write-Output \"Total lines: $lines\")"
+      "PowerShell($lines = \\(Get-Content \"C:\\\\Users\\\\MaxxPC\\\\IdeaProjects\\\\Pet_Hospital\\\\README.md\"\\).Count; Write-Output \"Total lines: $lines\")",
+      "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\MaxxPC\\\\IdeaProjects\\\\Pet_Hospital\\\\monitoring\\\\prometheus\")",
+      "Bash(Out-Null)",
+      "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\MaxxPC\\\\IdeaProjects\\\\Pet_Hospital\\\\monitoring\\\\grafana\\\\provisioning\\\\dashboards\")",
+      "Bash(Write-Output \"Directories created\")",
+      "PowerShell(New-Item *)"
     ]
   }
 }

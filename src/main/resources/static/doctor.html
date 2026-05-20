@@ -203,6 +203,17 @@ textarea.form-control{resize:vertical;min-height:80px}
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 .toast-success{background:#059669}.toast-error{background:#dc2626}.toast-info{background:#1d4ed8}.toast-warning{background:#d97706}
 
+/* ── Appointment cards ── */
+.appt-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:10px;display:flex;align-items:flex-start;gap:14px}
+.appt-avatar{width:40px;height:40px;border-radius:50%;background:var(--purple);color:#fff;font-weight:700;font-size:.9rem;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.appt-info{flex:1;min-width:0}
+.appt-name{font-weight:600;font-size:.9rem;margin-bottom:3px}
+.appt-meta{font-size:.77rem;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.appt-notes{font-size:.78rem;color:var(--text);font-style:italic;margin-top:4px}
+.badge-PENDING{background:#fef3c7;color:#92400e}
+.badge-CONFIRMED{background:var(--green-light);color:#065f46}
+.badge-CANCELLED{background:var(--red-light);color:#991b1b}
+
 /* ── Responsive ── */
 @media(max-width:900px){
   .stats-row{grid-template-columns:repeat(2,1fr)}
@@ -235,6 +246,10 @@ textarea.form-control{resize:vertical;min-height:80px}
       </button>
       <button class="nav-item" onclick="navigate('patients')" data-page="patients">
         <span class="nav-icon">👥</span> Мои пациенты
+      </button>
+      <button class="nav-item" onclick="navigate('appointments')" data-page="appointments">
+        <span class="nav-icon">📋</span> Приёмы
+        <span class="nav-badge" id="badge-appointments" style="display:none">0</span>
       </button>
       <button class="nav-item" onclick="navigate('chats')" data-page="chats">
         <span class="nav-icon">💬</span> Чаты с пациентами
@@ -302,6 +317,20 @@ textarea.form-control{resize:vertical;min-height:80px}
           <div class="empty"><span class="spinner"></span> Загрузка…</div>
         </div>
         <div id="patients-pagination" style="display:flex;justify-content:center;gap:6px;margin-top:20px"></div>
+      </div>
+
+      <!-- ════ APPOINTMENTS ════ -->
+      <div class="page" id="page-appointments">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div style="font-size:.82rem;color:var(--muted)">Записи на приём с клиентского портала</div>
+          <select class="filter-select" id="appt-filter" onchange="filterAppointments()">
+            <option value="">Все статусы</option>
+            <option value="PENDING">Ожидают</option>
+            <option value="CONFIRMED">Подтверждены</option>
+            <option value="CANCELLED">Отменены</option>
+          </select>
+        </div>
+        <div id="appointments-list"><div class="empty"><span class="spinner"></span> Загрузка…</div></div>
       </div>
 
       <!-- ════ CHATS ════ -->
@@ -401,7 +430,7 @@ async function api(path, method = 'GET', body = null) {
 }
 
 // ── Navigation ──
-const pageTitles = { dashboard:'Дашборд', patients:'Мои пациенты', chats:'Чаты с пациентами' };
+const pageTitles = { dashboard:'Дашборд', patients:'Мои пациенты', appointments:'Приёмы', chats:'Чаты с пациентами' };
 
 function navigate(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -411,9 +440,10 @@ function navigate(page) {
   document.getElementById('topbar-title').textContent = pageTitles[page] || page;
   currentPage = page;
   stopChatPoll();
-  if (page === 'dashboard') loadDashboard();
-  if (page === 'patients')  loadPatients();
-  if (page === 'chats')     loadChats();
+  if (page === 'dashboard')    loadDashboard();
+  if (page === 'patients')     loadPatients();
+  if (page === 'appointments') loadAppointments();
+  if (page === 'chats')        loadChats();
 }
 
 function reloadPage() { navigate(currentPage); }
@@ -757,6 +787,63 @@ async function sendPanelMsg() {
     }
     chatLastId = msg.id;
   } catch(e) { toast('Ошибка отправки', 'error'); }
+}
+
+// ── Appointments ──
+let allAppointments = [];
+
+async function loadAppointments() {
+  const el = document.getElementById('appointments-list');
+  el.innerHTML = '<div class="empty"><span class="spinner"></span> Загрузка…</div>';
+  try {
+    allAppointments = await api('/api/doctors/me/appointments') || [];
+    const badge = document.getElementById('badge-appointments');
+    const pending = allAppointments.filter(a => a.status === 'PENDING').length;
+    if (pending > 0) { badge.textContent = pending; badge.style.display = 'inline-flex'; }
+    else badge.style.display = 'none';
+    renderAppointments(allAppointments);
+  } catch(e) { el.innerHTML = '<div class="empty">Ошибка загрузки</div>'; }
+}
+
+function filterAppointments() {
+  const f = document.getElementById('appt-filter').value;
+  renderAppointments(f ? allAppointments.filter(a => a.status === f) : allAppointments);
+}
+
+function renderAppointments(list) {
+  const el = document.getElementById('appointments-list');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>Нет записей на приём</div>';
+    return;
+  }
+  el.innerHTML = list.map(a => {
+    const initials = (a.clientName||'?').split(' ').slice(0,2).map(w=>w[0]).join('');
+    const statusLabel = {PENDING:'Ожидает',CONFIRMED:'Подтверждена',CANCELLED:'Отменена'}[a.status]||a.status;
+    return `<div class="appt-card">
+      <div class="appt-avatar">${esc(initials)}</div>
+      <div class="appt-info">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span class="appt-name">${esc(a.clientName||'—')}</span>
+          <span class="badge badge-${a.status}">${statusLabel}</span>
+        </div>
+        <div class="appt-meta">
+          <span>📅 ${fmtDate(a.preferredDate)}${a.preferredTime?' &nbsp;🕐 '+esc(a.preferredTime):''}</span>
+          ${a.contactPhone?`<span>📞 ${esc(a.contactPhone)}</span>`:''}
+        </div>
+        ${a.notes?`<div class="appt-notes">"${esc(a.notes)}"</div>`:''}
+      </div>
+      ${a.clientUserId?`<button class="btn btn-outline btn-sm" onclick="openChatWithClient(${a.clientUserId})">💬 Чат</button>`:''}
+    </div>`;
+  }).join('');
+}
+
+async function openChatWithClient(clientUserId) {
+  navigate('chats');
+  await loadChats();
+  try {
+    const room = await api(`/api/chat/doctor/${clientUserId}`, 'POST');
+    if (room?.id) openChatRoom(room.id, room.clientName || 'Клиент');
+  } catch(e) { toast('Не удалось открыть чат', 'error'); }
 }
 
 // ── Chats page ──

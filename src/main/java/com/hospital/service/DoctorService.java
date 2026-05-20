@@ -2,11 +2,14 @@ package com.hospital.service;
 
 import com.hospital.dto.request.CreateDoctorRequest;
 import com.hospital.dto.request.UpdateDoctorRequest;
+import com.hospital.dto.response.AppointmentResponse;
 import com.hospital.dto.response.DoctorResponse;
 import com.hospital.dto.response.PageResponse;
 import com.hospital.dto.response.PatientResponse;
 import com.hospital.entity.Specialty;
 import org.springframework.data.domain.Pageable;
+
+import java.util.List;
 
 /**
  * Контракт сервисного слоя для работы с врачами.
@@ -132,4 +135,13 @@ public interface DoctorService {
      * @return данные врача, привязанного к этому пользователю
      */
     DoctorResponse getMe(Long userId);
+
+    /**
+     * Возвращает список записей на приём к врачу, привязанному к данному пользователю.
+     * Используется в doctor.html: врач видит все заявки от клиентского портала.
+     *
+     * @param userId идентификатор пользователя (users.id из JWT)
+     * @return список записей на приём с данными клиента
+     */
+    List<AppointmentResponse> getMyAppointments(Long userId);
 }

@@ -432,13 +432,19 @@ function isWeekend(dateStr) {
 }
 
 function checkBookDateWeekend() {
-  const val = document.getElementById('book-date').value;
+  const input = document.getElementById('book-date');
   const warn = document.getElementById('book-date-warn');
-  if (val && isWeekend(val)) {
-    warn.textContent = 'Приём в выходные не ведётся. Выберите рабочий день (пн–пт).';
+  if (!input.value) { warn.style.display = 'none'; return; }
+  const [y, m, d] = input.value.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const day = date.getDay();
+  if (day === 6) date.setDate(date.getDate() + 2); // суббота → понедельник
+  if (day === 0) date.setDate(date.getDate() + 1); // воскресенье → понедельник
+  if (day === 0 || day === 6) {
+    input.value = date.toISOString().slice(0, 10);
+    warn.textContent = 'Врачи отдыхают в выходные. Дата перенесена на ближайший понедельник.';
     warn.style.display = 'block';
-  } else {
-    warn.style.display = 'none';
+    setTimeout(() => { warn.style.display = 'none'; }, 3500);
   }
 }
 

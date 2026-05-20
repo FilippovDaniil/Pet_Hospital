@@ -18,6 +18,8 @@ public class AppointmentResponse {
     private String doctorName;
     private String doctorSpecialty;
     private String departmentName;
+    private Long clientUserId;
+    private String clientName;
     private LocalDate preferredDate;
     private String preferredTime;
     private String contactPhone;

@@ -2,6 +2,7 @@ package com.hospital.service.impl;
 
 import com.hospital.dto.request.CreateDoctorRequest;
 import com.hospital.dto.request.UpdateDoctorRequest;
+import com.hospital.dto.response.AppointmentResponse;
 import com.hospital.dto.response.DoctorResponse;
 import com.hospital.dto.response.PageResponse;
 import com.hospital.dto.response.PatientResponse;
@@ -11,6 +12,7 @@ import com.hospital.entity.Specialty;
 import com.hospital.exception.ResourceNotFoundException;
 import com.hospital.mapper.DoctorMapper;
 import com.hospital.mapper.PatientMapper;
+import com.hospital.repository.AppointmentRepository;
 import com.hospital.repository.DepartmentRepository;
 import com.hospital.repository.DoctorRepository;
 import com.hospital.repository.PatientRepository;
@@ -25,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -52,6 +55,7 @@ public class DoctorServiceImpl implements DoctorService {
     private final DoctorRepository doctorRepository;
     private final DepartmentRepository departmentRepository;
     private final PatientRepository patientRepository;
+    private final AppointmentRepository appointmentRepository;
     private final DoctorMapper doctorMapper;
     private final PatientMapper patientMapper;
     private final EventPublisher eventPublisher;
@@ -178,6 +182,27 @@ public class DoctorServiceImpl implements DoctorService {
         Doctor doctor = doctorRepository.findByLinkedUserIdAndActiveTrue(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor for user", userId));
         return doctorMapper.toResponse(doctor);
+    }
+
+    @Override
+    public List<AppointmentResponse> getMyAppointments(Long userId) {
+        Doctor doctor = doctorRepository.findByLinkedUserIdAndActiveTrue(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor for user", userId));
+        return appointmentRepository.findByDoctorIdWithDetails(doctor.getId()).stream()
+                .map(a -> AppointmentResponse.builder()
+                        .id(a.getId())
+                        .clientUserId(a.getClientUser().getId())
+                        .clientName(a.getClientUser().getFullName())
+                        .doctorId(a.getDoctor().getId())
+                        .doctorName(a.getDoctor().getFullName())
+                        .preferredDate(a.getPreferredDate())
+                        .preferredTime(a.getPreferredTime())
+                        .contactPhone(a.getContactPhone())
+                        .notes(a.getNotes())
+                        .status(a.getStatus().name())
+                        .createdAt(a.getCreatedAt())
+                        .build())
+                .toList();
     }
 
     /**

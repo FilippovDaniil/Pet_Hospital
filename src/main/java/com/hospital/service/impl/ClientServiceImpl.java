@@ -135,6 +135,8 @@ public class ClientServiceImpl implements ClientService {
                 .doctorName(a.getDoctor().getFullName())
                 .doctorSpecialty(a.getDoctor().getSpecialty().name())
                 .departmentName(a.getDoctor().getDepartment().getName())
+                .clientUserId(a.getClientUser().getId())
+                .clientName(a.getClientUser().getFullName())
                 .preferredDate(a.getPreferredDate())
                 .preferredTime(a.getPreferredTime())
                 .contactPhone(a.getContactPhone())

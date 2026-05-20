@@ -11,4 +11,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
 
     @Query("SELECT a FROM Appointment a JOIN FETCH a.doctor d JOIN FETCH d.department WHERE a.clientUser.id = :userId ORDER BY a.createdAt DESC")
     List<Appointment> findByClientUserIdWithDetails(@Param("userId") Long userId);
+
+    @Query("SELECT a FROM Appointment a JOIN FETCH a.clientUser JOIN FETCH a.doctor d JOIN FETCH d.department WHERE a.doctor.id = :doctorId ORDER BY a.createdAt DESC")
+    List<Appointment> findByDoctorIdWithDetails(@Param("doctorId") Long doctorId);
 }

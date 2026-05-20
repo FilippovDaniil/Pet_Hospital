@@ -75,6 +75,9 @@ management:
   info:
     env:
       enabled: true
+  metrics:
+    tags:
+      application: pet-hospital
 
 info:
   app:

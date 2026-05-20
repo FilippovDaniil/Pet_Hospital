@@ -2,12 +2,15 @@ package com.hospital.controller;
 
 import com.hospital.dto.request.CreateDoctorRequest;
 import com.hospital.dto.request.UpdateDoctorRequest;
+import com.hospital.dto.response.AppointmentResponse;
 import com.hospital.dto.response.DoctorResponse;
 import com.hospital.dto.response.PageResponse;
 import com.hospital.dto.response.PatientResponse;
 import com.hospital.entity.Specialty;
 import com.hospital.entity.User;
 import com.hospital.repository.UserRepository;
+
+import java.util.List;
 import com.hospital.service.DoctorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -63,6 +66,13 @@ public class DoctorController {
     public ResponseEntity<DoctorResponse> getMe(Authentication auth) {
         User user = userRepository.findByUsername(auth.getName()).orElseThrow();
         return ResponseEntity.ok(doctorService.getMe(user.getId()));
+    }
+
+    @GetMapping("/me/appointments")
+    @Operation(summary = "Записи на приём к текущему врачу (с клиентского портала)")
+    public ResponseEntity<List<AppointmentResponse>> getMyAppointments(Authentication auth) {
+        User user = userRepository.findByUsername(auth.getName()).orElseThrow();
+        return ResponseEntity.ok(doctorService.getMyAppointments(user.getId()));
     }
 
     /**
