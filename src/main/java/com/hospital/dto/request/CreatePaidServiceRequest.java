@@ -50,4 +50,7 @@ public class CreatePaidServiceRequest {
      * Необязательное поле; при отсутствии сохраняется как {@code null}.
      */
     private String description;
+
+    /** Длительность слота: 30 или 60 минут. По умолчанию 60. */
+    private int slotMinutes = 60;
 }

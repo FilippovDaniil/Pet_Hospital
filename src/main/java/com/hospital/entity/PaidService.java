@@ -79,4 +79,12 @@ public class PaidService {
     @Column(nullable = false)
     @Builder.Default
     private boolean active = true;
+
+    /**
+     * Длительность одного слота приёма в минутах: 30 или 60.
+     * Используется фронтендом для генерации допустимых временных слотов (10:00–19:00).
+     */
+    @Column(name = "slot_minutes", nullable = false)
+    @Builder.Default
+    private int slotMinutes = 60;
 }

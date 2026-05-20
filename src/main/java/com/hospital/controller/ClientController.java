@@ -3,7 +3,10 @@ package com.hospital.controller;
 import com.hospital.dto.request.AppointmentRequest;
 import com.hospital.dto.request.ServiceOrderRequest;
 import com.hospital.dto.response.*;
+import com.hospital.entity.User;
+import com.hospital.repository.UserRepository;
 import com.hospital.service.ClientService;
+import com.hospital.service.NurseService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -22,6 +25,8 @@ import java.util.List;
 public class ClientController {
 
     private final ClientService clientService;
+    private final NurseService nurseService;
+    private final UserRepository userRepository;
 
     @GetMapping("/doctors")
     @Operation(summary = "Список всех врачей (публичный)")
@@ -69,5 +74,12 @@ public class ClientController {
     @Operation(summary = "Мои заказы услуг (требует ROLE_CLIENT)")
     public ResponseEntity<List<ServiceOrderResponse>> getMyOrders(Authentication authentication) {
         return ResponseEntity.ok(clientService.getMyOrders(authentication.getName()));
+    }
+
+    @GetMapping("/my-assignments")
+    @Operation(summary = "Мои назначения от медсестры (требует ROLE_CLIENT)")
+    public ResponseEntity<List<NurseAssignmentResponse>> getMyAssignments(Authentication authentication) {
+        User user = userRepository.findByUsername(authentication.getName()).orElseThrow();
+        return ResponseEntity.ok(nurseService.getClientAssignments(user.getId()));
     }
 }

@@ -291,15 +291,10 @@ public class ChatServiceImpl implements ChatService {
      * а не в памяти, что важно для корректности при большом количестве сообщений.
      */
     @Override
+    @Transactional
     public List<ChatMessageResponse> getRoomMessages(Long roomId, User requester) {
-        // getAccessibleRoom бросит ResourceNotFoundException (404) или
-        // BusinessRuleException (403) если доступ не разрешён.
         ChatRoom room = getAccessibleRoom(roomId, requester);
-
-        // findByRoomIdOrderBySentAt — метод Spring Data JPA, генерирующий
-        // SELECT ... WHERE room_id = ? ORDER BY sent_at ASC.
-        // Сообщения загружаются с JOIN FETCH sender, чтобы в toMessageResponse()
-        // обращение к message.getSender().getFullName() не порождало N+1 запросов.
+        chatMessageRepository.markMessagesAsRead(room.getId(), requester.getId());
         return chatMessageRepository.findByRoomIdOrderBySentAt(room.getId()).stream()
                 .map(this::toMessageResponse)
                 .toList();
@@ -367,13 +362,10 @@ public class ChatServiceImpl implements ChatService {
      *                первый запрос передаёт sinceId=0 для получения всех сообщений
      */
     @Override
+    @Transactional
     public List<ChatMessageResponse> pollMessages(Long roomId, Long sinceId, User requester) {
         ChatRoom room = getAccessibleRoom(roomId, requester);
-
-        // findByRoomIdAndIdGreaterThan — Spring Data автоматически генерирует:
-        //   SELECT ... WHERE room_id = ? AND id > ? ORDER BY id ASC
-        // «ORDER BY id» здесь семантически эквивалентен «ORDER BY sentAt»,
-        // так как id является суррогатным ключом с автоинкрементом.
+        chatMessageRepository.markMessagesAsRead(room.getId(), requester.getId());
         return chatMessageRepository.findByRoomIdAndIdGreaterThan(room.getId(), sinceId).stream()
                 .map(this::toMessageResponse)
                 .toList();

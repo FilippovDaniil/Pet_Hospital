@@ -6,6 +6,23 @@
   <title>Портал медсестры — Больница</title>
   <link rel="stylesheet" href="/css/style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    .badge-low { background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;padding:2px 8px;border-radius:6px;font-size:.72rem;font-weight:600 }
+    .badge-ok  { background:#f0fdf4;color:#16a34a;border:1px solid #86efac;padding:2px 8px;border-radius:6px;font-size:.72rem;font-weight:600 }
+    .badge-active    { background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;padding:2px 8px;border-radius:6px;font-size:.72rem;font-weight:600 }
+    .badge-done      { background:#f0fdf4;color:#16a34a;border:1px solid #86efac;padding:2px 8px;border-radius:6px;font-size:.72rem;font-weight:600 }
+    .badge-cancelled { background:#f9fafb;color:#6b7280;border:1px solid #d1d5db;padding:2px 8px;border-radius:6px;font-size:.72rem;font-weight:600 }
+    .badge-medicine   { background:#faf5ff;color:#7c3aed;border:1px solid #c4b5fd;padding:2px 8px;border-radius:6px;font-size:.72rem;font-weight:600 }
+    .badge-consumable { background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;padding:2px 8px;border-radius:6px;font-size:.72rem;font-weight:600 }
+    .badge-equipment  { background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd;padding:2px 8px;border-radius:6px;font-size:.72rem;font-weight:600 }
+    .qty-cell { display:flex;align-items:center;gap:6px }
+    .qty-low  { color:#dc2626;font-weight:700 }
+    .filter-bar { display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-left:auto }
+    .client-search-results { position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d1d5db;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);max-height:200px;overflow-y:auto;z-index:100 }
+    .client-search-results .result-item { padding:8px 12px;cursor:pointer;font-size:.85rem }
+    .client-search-results .result-item:hover { background:#f1f5f9 }
+    .pos-rel { position:relative }
+  </style>
 </head>
 <body>
 <div class="layout">
@@ -23,15 +40,22 @@
         <i class="fa fa-gauge-high"></i><span>Дашборд</span>
       </a>
 
-      <div class="nav-section-title">Управление</div>
+      <div class="nav-section-title">Склад</div>
+      <a href="#" data-nav="supplies" onclick="navigate('supplies');return false">
+        <i class="fa fa-pills"></i><span>Медикаменты</span>
+      </a>
+
+      <div class="nav-section-title">Назначения</div>
+      <a href="#" data-nav="assignments" onclick="navigate('assignments');return false">
+        <i class="fa fa-syringe"></i><span>Назначения</span>
+      </a>
+
+      <div class="nav-section-title">HIS</div>
       <a href="#" data-nav="patients" onclick="navigate('patients');return false">
         <i class="fa fa-users"></i><span>Пациенты</span>
       </a>
       <a href="#" data-nav="wards" onclick="navigate('wards');return false">
         <i class="fa fa-bed"></i><span>Палаты</span>
-      </a>
-      <a href="#" data-nav="services" onclick="navigate('services');return false">
-        <i class="fa fa-file-invoice-dollar"></i><span>Услуги</span>
       </a>
     </nav>
 
@@ -58,27 +82,105 @@
       <div id="page-dashboard" class="section-page">
         <div class="stat-grid">
           <div class="stat-card">
-            <div class="stat-icon blue"><i class="fa fa-users"></i></div>
-            <div><div class="stat-value" id="stat-patients">…</div><div class="stat-label">Пациентов</div></div>
+            <div class="stat-icon teal"><i class="fa fa-pills"></i></div>
+            <div><div class="stat-value" id="stat-supplies">…</div><div class="stat-label">Позиций на складе</div></div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon orange"><i class="fa fa-bed"></i></div>
-            <div><div class="stat-value" id="stat-wards">…</div><div class="stat-label">Палат</div></div>
+            <div class="stat-icon red"><i class="fa fa-triangle-exclamation"></i></div>
+            <div><div class="stat-value" id="stat-low">…</div><div class="stat-label">Мало на складе</div></div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon teal"><i class="fa fa-door-open"></i></div>
-            <div><div class="stat-value" id="stat-free">…</div><div class="stat-label">Свободных мест</div></div>
+            <div class="stat-icon blue"><i class="fa fa-syringe"></i></div>
+            <div><div class="stat-value" id="stat-active-assign">…</div><div class="stat-label">Активных назначений</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon orange"><i class="fa fa-users"></i></div>
+            <div><div class="stat-value" id="stat-patients">…</div><div class="stat-label">Пациентов HIS</div></div>
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-header"><i class="fa fa-clock-rotate-left"></i> Последние пациенты</div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-header"><i class="fa fa-triangle-exclamation" style="color:#dc2626"></i> Заканчивается на складе</div>
           <div class="card-body" style="padding:0">
             <div class="table-wrapper">
               <table>
-                <thead><tr><th>ФИО</th><th>Статус</th><th>Врач</th><th>Палата</th></tr></thead>
-                <tbody id="recent-patients">
+                <thead><tr><th>Наименование</th><th>Категория</th><th>Остаток</th><th>Мин. остаток</th></tr></thead>
+                <tbody id="low-stock-table">
                   <tr><td colspan="4" style="text-align:center;padding:20px"><div class="spinner"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="card-header"><i class="fa fa-clock"></i> Последние назначения</div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrapper">
+              <table>
+                <thead><tr><th>Клиент</th><th>Процедура</th><th>Назначение</th><th>Дата</th><th>Статус</th></tr></thead>
+                <tbody id="recent-assignments">
+                  <tr><td colspan="5" style="text-align:center;padding:20px"><div class="spinner"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======== SUPPLIES ======== -->
+      <div id="page-supplies" class="section-page">
+        <div class="card">
+          <div class="card-header">
+            <i class="fa fa-pills"></i> Склад медикаментов
+            <div class="filter-bar">
+              <select id="supply-cat-filter" class="form-control" style="width:150px;padding:5px 8px;font-size:.82rem" onchange="loadSupplies()">
+                <option value="">Все категории</option>
+                <option value="MEDICINE">Медикаменты</option>
+                <option value="CONSUMABLE">Расходники</option>
+                <option value="EQUIPMENT">Оборудование</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="openModal('modal-supply')"><i class="fa fa-plus"></i> Добавить</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr><th>#</th><th>Наименование</th><th>Категория</th><th>Остаток</th><th>Ед. изм.</th><th>Мин.</th><th>Действия</th></tr>
+                </thead>
+                <tbody id="supplies-table">
+                  <tr><td colspan="7" style="text-align:center;padding:24px"><div class="spinner"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======== ASSIGNMENTS ======== -->
+      <div id="page-assignments" class="section-page">
+        <div class="card">
+          <div class="card-header">
+            <i class="fa fa-syringe"></i> Назначения процедур
+            <div class="filter-bar">
+              <select id="assign-status-filter" class="form-control" style="width:150px;padding:5px 8px;font-size:.82rem" onchange="loadAssignments()">
+                <option value="">Все статусы</option>
+                <option value="ACTIVE">Активные</option>
+                <option value="DONE">Выполнено</option>
+                <option value="CANCELLED">Отменено</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="openCreateAssignmentModal()"><i class="fa fa-plus"></i> Назначить</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr><th>#</th><th>Клиент</th><th>Процедура</th><th>Название</th><th>Доза</th><th>Дата/время</th><th>Статус</th><th>Действия</th></tr>
+                </thead>
+                <tbody id="assignments-table">
+                  <tr><td colspan="8" style="text-align:center;padding:24px"><div class="spinner"></div></td></tr>
                 </tbody>
               </table>
             </div>
@@ -90,7 +192,7 @@
       <div id="page-patients" class="section-page">
         <div class="card">
           <div class="card-header">
-            <i class="fa fa-users"></i> Пациенты
+            <i class="fa fa-users"></i> Пациенты HIS
             <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <input id="patient-search" class="form-control" style="width:200px;padding:5px 8px;font-size:.82rem"
                      placeholder="Поиск по ФИО..." oninput="debouncedSearch()" />
@@ -106,9 +208,7 @@
           <div class="card-body" style="padding:0">
             <div class="table-wrapper">
               <table>
-                <thead>
-                  <tr><th>#</th><th>ФИО</th><th>СНИЛС</th><th>Статус</th><th>Врач</th><th>Палата</th></tr>
-                </thead>
+                <thead><tr><th>#</th><th>ФИО</th><th>СНИЛС</th><th>Статус</th><th>Врач</th><th>Палата</th></tr></thead>
                 <tbody id="patients-table">
                   <tr><td colspan="6" style="text-align:center;padding:24px"><div class="spinner"></div></td></tr>
                 </tbody>
@@ -122,9 +222,7 @@
       <!-- ======== WARDS ======== -->
       <div id="page-wards" class="section-page">
         <div class="card">
-          <div class="card-header">
-            <i class="fa fa-bed"></i> Палаты
-          </div>
+          <div class="card-header"><i class="fa fa-bed"></i> Палаты</div>
           <div class="card-body" style="padding:0">
             <div class="table-wrapper">
               <table>
@@ -138,29 +236,137 @@
         </div>
       </div>
 
-      <!-- ======== SERVICES ======== -->
-      <div id="page-services" class="section-page">
-        <div class="card">
-          <div class="card-header">
-            <i class="fa fa-file-invoice-dollar"></i> Платные услуги
-          </div>
-          <div class="card-body" style="padding:0">
-            <div class="table-wrapper">
-              <table>
-                <thead><tr><th>#</th><th>Название</th><th>Цена</th><th>Статус</th></tr></thead>
-                <tbody id="services-table">
-                  <tr><td colspan="4" style="text-align:center;padding:24px"><div class="spinner"></div></td></tr>
-                </tbody>
-              </table>
-            </div>
-            <div class="pagination" id="services-pagination" style="padding:0 16px 12px"></div>
-          </div>
-        </div>
-      </div>
-
     </div><!-- /page-content -->
   </main>
 </div><!-- /layout -->
+
+<!-- ===== MODAL: Добавить/редактировать позицию склада ===== -->
+<div class="modal-overlay" id="modal-supply">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title" id="supply-modal-title">Добавить позицию</span>
+      <button class="modal-close" onclick="closeModal('modal-supply')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="supply-edit-id" />
+      <div class="form-group">
+        <label class="form-label">Наименование *</label>
+        <input id="supply-name" class="form-control" placeholder="Например: Амоксициллин 500 мг" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Категория *</label>
+        <select id="supply-category" class="form-control">
+          <option value="MEDICINE">Медикамент</option>
+          <option value="CONSUMABLE">Расходник</option>
+          <option value="EQUIPMENT">Оборудование</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Количество</label>
+          <input id="supply-quantity" class="form-control" type="number" min="0" value="0" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ед. изм.</label>
+          <input id="supply-unit" class="form-control" placeholder="шт / мл / амп" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Мин. остаток</label>
+          <input id="supply-min" class="form-control" type="number" min="0" value="5" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Описание</label>
+        <textarea id="supply-desc" class="form-control" rows="2" placeholder="Краткое описание (необязательно)"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-supply')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveSupply()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: Корректировка остатка ===== -->
+<div class="modal-overlay" id="modal-adjust">
+  <div class="modal-box" style="max-width:380px">
+    <div class="modal-header">
+      <span class="modal-title">Изменить остаток</span>
+      <button class="modal-close" onclick="closeModal('modal-adjust')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="adjust-id" />
+      <p id="adjust-name" style="font-weight:600;color:#1a6fc4;margin:0 0 12px"></p>
+      <p style="font-size:.82rem;color:#64748b;margin:0 0 12px">Текущий остаток: <strong id="adjust-current">0</strong></p>
+      <div class="form-group">
+        <label class="form-label">Изменение (+ пополнение / − расход)</label>
+        <input id="adjust-delta" class="form-control" type="number" value="0" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-adjust')">Отмена</button>
+      <button class="btn btn-primary" onclick="doAdjust()">Применить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: Назначить процедуру ===== -->
+<div class="modal-overlay" id="modal-assignment">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Назначить процедуру</span>
+      <button class="modal-close" onclick="closeModal('modal-assignment')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group pos-rel">
+        <label class="form-label">Клиент (поиск по имени) *</label>
+        <input id="assign-client-search" class="form-control" placeholder="Начните вводить имя клиента..." autocomplete="off"
+               oninput="searchClients()" />
+        <input type="hidden" id="assign-client-id" />
+        <div id="client-results" class="client-search-results" style="display:none"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Тип процедуры *</label>
+        <select id="assign-type" class="form-control">
+          <option value="INJECTION">Укол</option>
+          <option value="PILL">Приём таблеток</option>
+          <option value="DRESSING">Перевязка</option>
+          <option value="PROCEDURE">Процедура</option>
+          <option value="OTHER">Прочее</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Название *</label>
+        <input id="assign-title" class="form-control" placeholder="Например: Инъекция Гепарина 5000 ЕД" />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Дозировка</label>
+          <input id="assign-dosage" class="form-control" placeholder="5000 ЕД / 1 таб / 10 мл" />
+        </div>
+        <div class="form-group"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Дата</label>
+          <input id="assign-date" class="form-control" type="date" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Время</label>
+          <input id="assign-time" class="form-control" type="time" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Описание / Инструкция</label>
+        <textarea id="assign-desc" class="form-control" rows="2" placeholder="Дополнительные инструкции"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-assignment')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveAssignment()">Назначить</button>
+    </div>
+  </div>
+</div>
 
 <!-- Admit Patient to Ward -->
 <div class="modal-overlay" id="modal-admit">
@@ -189,7 +395,7 @@
 <script>
 'use strict';
 
-// ── Role guard: ROLE_NURSE only ──
+// ── Role guard ──
 (function() {
   const t = localStorage.getItem('token');
   const r = localStorage.getItem('role');
@@ -199,7 +405,6 @@
 const API = '';
 let currentSection = 'dashboard';
 let patientsPage = 0;
-let servicesPage = 0;
 
 document.addEventListener('DOMContentLoaded', () => {
   const name = localStorage.getItem('fullName') || localStorage.getItem('username') || '';
@@ -215,25 +420,27 @@ function navigate(section) {
   if (page) page.classList.add('active');
   const link = document.querySelector(`[data-nav="${section}"]`);
   if (link) link.classList.add('active');
-  document.getElementById('topbarTitle').textContent = {
-    dashboard: 'Дашборд', patients: 'Пациенты', wards: 'Палаты', services: 'Платные услуги'
-  }[section] || section;
+  const titles = {
+    dashboard: 'Дашборд', supplies: 'Склад медикаментов',
+    assignments: 'Назначения процедур', patients: 'Пациенты HIS', wards: 'Палаты'
+  };
+  document.getElementById('topbarTitle').textContent = titles[section] || section;
   currentSection = section;
-  if (section === 'dashboard') loadDashboard();
-  if (section === 'patients')  loadPatients(0);
-  if (section === 'wards')     loadWards();
-  if (section === 'services')  loadServices(0);
+  if (section === 'dashboard')   loadDashboard();
+  if (section === 'supplies')    loadSupplies();
+  if (section === 'assignments') loadAssignments();
+  if (section === 'patients')    loadPatients(0);
+  if (section === 'wards')       loadWards();
 }
 
-// ── Modal helpers ──
 function openModal(id)  { document.getElementById(id)?.classList.add('open'); }
 function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
-
 document.addEventListener('click', e => {
   if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
 });
 
-// ── Utils ──
+function logout() { localStorage.clear(); window.location.href = '/login.html'; }
+
 function toast(msg, type = 'success') {
   const el = document.createElement('div');
   el.className = `toast ${type}`;
@@ -255,76 +462,315 @@ async function apiFetch(path, options = {}) {
     if (!res.ok) { const msg = data.message || 'Server error'; toast(msg, 'error'); throw new Error(msg); }
     return data;
   } catch(e) {
-    if (!(e instanceof Error && e.message === 'Unauthorized')) toast(e.toString(), 'error');
+    if (!(e instanceof Error && e.message === 'Unauthorized')) toast(e.message || e.toString(), 'error');
     throw e;
   }
 }
 
-function logout() { localStorage.clear(); window.location.href = '/login.html'; }
+function esc(s) { return s == null ? '—' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-function escHtml(s) { return s == null ? '—' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function categoryBadge(cat) {
+  const map = { MEDICINE: 'badge-medicine', CONSUMABLE: 'badge-consumable', EQUIPMENT: 'badge-equipment' };
+  const lbl = { MEDICINE: 'Медикамент', CONSUMABLE: 'Расходник', EQUIPMENT: 'Оборудование' };
+  return `<span class="${map[cat] || ''}">${lbl[cat] || cat}</span>`;
+}
 
 function statusBadge(s) {
   const map = {
     TREATMENT:  ['badge-treatment',  'На лечении'],
     DISCHARGED: ['badge-discharged', 'Выписан'],
     TRANSFERRED:['badge-transferred','Переведён'],
+    ACTIVE:     ['badge-active',   'Активно'],
+    DONE:       ['badge-done',     'Выполнено'],
+    CANCELLED:  ['badge-cancelled','Отменено'],
   };
   const [cls, label] = map[s] || ['', s];
-  return `<span class="badge ${cls}">${label}</span>`;
-}
-
-function activeBadge(a) {
-  return a
-    ? `<span class="badge badge-active">Активна</span>`
-    : `<span class="badge badge-inactive">Неактивна</span>`;
+  return `<span class="${cls}">${label}</span>`;
 }
 
 function occupancyBar(occ, cap) {
   const pct = cap ? Math.round((occ / cap) * 100) : 0;
   const cls = pct < 60 ? 'occ-low' : pct < 90 ? 'occ-mid' : 'occ-high';
-  return `
-    <div style="display:flex;align-items:center;gap:8px">
-      <div class="occ-bar"><div class="occ-bar-fill ${cls}" style="width:${pct}%"></div></div>
-      <small>${occ}/${cap}</small>
-    </div>`;
+  return `<div style="display:flex;align-items:center;gap:8px">
+    <div class="occ-bar"><div class="occ-bar-fill ${cls}" style="width:${pct}%"></div></div>
+    <small>${occ}/${cap}</small>
+  </div>`;
 }
 
 function buildPagination(containerId, data, onPageFn) {
   const c = document.getElementById(containerId);
   if (!c) return;
   if (data.totalPages <= 1) { c.innerHTML = ''; return; }
-  let html = `<button ${data.page === 0 ? 'disabled' : ''} onclick="${onPageFn}(${data.page - 1})">‹</button>`;
+  let html = `<button ${data.page===0?'disabled':''} onclick="${onPageFn}(${data.page-1})">‹</button>`;
   for (let i = 0; i < data.totalPages; i++) {
-    html += `<button class="${i === data.page ? 'active' : ''}" onclick="${onPageFn}(${i})">${i + 1}</button>`;
+    html += `<button class="${i===data.page?'active':''}" onclick="${onPageFn}(${i})">${i+1}</button>`;
   }
-  html += `<button ${data.last ? 'disabled' : ''} onclick="${onPageFn}(${data.page + 1})">›</button>`;
+  html += `<button ${data.last?'disabled':''} onclick="${onPageFn}(${data.page+1})">›</button>`;
   c.innerHTML = html;
 }
 
 // ── Dashboard ──
 async function loadDashboard() {
   try {
-    const [patients, wards] = await Promise.all([
+    const [supplies, assignments, patients] = await Promise.all([
+      apiFetch('/api/nurse/supplies'),
+      apiFetch('/api/nurse/assignments'),
       apiFetch('/api/patients?size=1'),
-      apiFetch('/api/wards'),
     ]);
-    const totalCap = wards.reduce((s, w) => s + w.capacity, 0);
-    const totalOcc = wards.reduce((s, w) => s + w.currentOccupancy, 0);
-    document.getElementById('stat-patients').textContent = patients.totalElements ?? '—';
-    document.getElementById('stat-wards').textContent    = wards.length ?? '—';
-    document.getElementById('stat-free').textContent     = (totalCap - totalOcc) + ' / ' + totalCap;
 
-    const recent = await apiFetch('/api/patients?size=5&page=0');
-    document.getElementById('recent-patients').innerHTML = recent.content.length === 0
-      ? '<tr><td colspan="4" class="empty-state">Нет пациентов</td></tr>'
-      : recent.content.map(p => `
-          <tr>
-            <td>${escHtml(p.fullName)}</td>
-            <td>${statusBadge(p.status)}</td>
-            <td>${escHtml(p.currentDoctorName)}</td>
-            <td>${escHtml(p.currentWardNumber)}</td>
-          </tr>`).join('');
+    const lowItems  = (supplies || []).filter(s => s.lowStock);
+    const activeAss = (assignments || []).filter(a => a.status === 'ACTIVE');
+
+    document.getElementById('stat-supplies').textContent    = (supplies || []).length;
+    document.getElementById('stat-low').textContent         = lowItems.length;
+    document.getElementById('stat-active-assign').textContent = activeAss.length;
+    document.getElementById('stat-patients').textContent    = patients?.totalElements ?? '—';
+
+    // Low stock table
+    document.getElementById('low-stock-table').innerHTML = lowItems.length === 0
+      ? '<tr><td colspan="4" style="text-align:center;padding:16px;color:#16a34a">✓ Всё в норме</td></tr>'
+      : lowItems.map(s => `<tr>
+          <td>${esc(s.name)}</td>
+          <td>${categoryBadge(s.category)}</td>
+          <td class="qty-cell"><span class="qty-low">${s.quantity} ${esc(s.unit)}</span></td>
+          <td>${s.minQuantity} ${esc(s.unit)}</td>
+        </tr>`).join('');
+
+    // Recent assignments
+    const recent = (assignments || []).slice(0, 8);
+    document.getElementById('recent-assignments').innerHTML = recent.length === 0
+      ? '<tr><td colspan="5" style="text-align:center;padding:16px">Назначений нет</td></tr>'
+      : recent.map(a => `<tr>
+          <td>${esc(a.clientName)}</td>
+          <td>${esc(a.procedureTypeLabel)}</td>
+          <td>${esc(a.title)}</td>
+          <td>${a.scheduledDate ? a.scheduledDate + (a.scheduledTime ? ' ' + a.scheduledTime.slice(0,5) : '') : '—'}</td>
+          <td>${statusBadge(a.status)}</td>
+        </tr>`).join('');
+  } catch (_) {}
+}
+
+// ── Supplies ──
+async function loadSupplies() {
+  const cat = document.getElementById('supply-cat-filter')?.value || '';
+  const url = cat ? `/api/nurse/supplies` : '/api/nurse/supplies';
+  const data = await apiFetch(url);
+  if (!data) return;
+
+  const filtered = cat ? data.filter(s => s.category === cat) : data;
+
+  document.getElementById('supplies-table').innerHTML = filtered.length === 0
+    ? '<tr><td colspan="7" style="text-align:center;padding:24px">Позиций нет</td></tr>'
+    : filtered.map(s => `<tr>
+        <td><strong>#${s.id}</strong></td>
+        <td>${esc(s.name)}</td>
+        <td>${categoryBadge(s.category)}</td>
+        <td class="qty-cell">
+          <span class="${s.lowStock ? 'qty-low' : ''}">${s.quantity}</span>
+          ${s.lowStock ? '<span class="badge-low">Мало</span>' : '<span class="badge-ok">В норме</span>'}
+        </td>
+        <td>${esc(s.unit)}</td>
+        <td>${s.minQuantity}</td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick="editSupply(${s.id})"><i class="fa fa-pen"></i></button>
+          <button class="btn btn-outline btn-sm" onclick="openAdjust(${s.id},'${esc(s.name)}',${s.quantity})" title="Корректировка"><i class="fa fa-scale-balanced"></i></button>
+          <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5" onclick="deleteSupply(${s.id})"><i class="fa fa-trash"></i></button>
+        </td>
+      </tr>`).join('');
+}
+
+function openSupplyModal() {
+  document.getElementById('supply-modal-title').textContent = 'Добавить позицию';
+  document.getElementById('supply-edit-id').value = '';
+  document.getElementById('supply-name').value     = '';
+  document.getElementById('supply-category').value = 'MEDICINE';
+  document.getElementById('supply-quantity').value = '0';
+  document.getElementById('supply-unit').value     = 'шт';
+  document.getElementById('supply-min').value      = '5';
+  document.getElementById('supply-desc').value     = '';
+  openModal('modal-supply');
+}
+
+async function editSupply(id) {
+  const data = await apiFetch('/api/nurse/supplies');
+  const s = (data || []).find(x => x.id === id);
+  if (!s) return;
+  document.getElementById('supply-modal-title').textContent = 'Редактировать позицию';
+  document.getElementById('supply-edit-id').value    = s.id;
+  document.getElementById('supply-name').value       = s.name;
+  document.getElementById('supply-category').value   = s.category;
+  document.getElementById('supply-quantity').value   = s.quantity;
+  document.getElementById('supply-unit').value       = s.unit;
+  document.getElementById('supply-min').value        = s.minQuantity;
+  document.getElementById('supply-desc').value       = s.description || '';
+  openModal('modal-supply');
+}
+
+async function saveSupply() {
+  const id   = document.getElementById('supply-edit-id').value;
+  const body = {
+    name:        document.getElementById('supply-name').value.trim(),
+    category:    document.getElementById('supply-category').value,
+    quantity:    parseInt(document.getElementById('supply-quantity').value) || 0,
+    unit:        document.getElementById('supply-unit').value.trim() || 'шт',
+    description: document.getElementById('supply-desc').value.trim() || null,
+    minQuantity: parseInt(document.getElementById('supply-min').value) || 5,
+  };
+  if (!body.name) { toast('Введите наименование', 'warning'); return; }
+  try {
+    if (id) {
+      await apiFetch(`/api/nurse/supplies/${id}`, { method:'PUT', body: JSON.stringify(body) });
+      toast('Позиция обновлена');
+    } else {
+      await apiFetch('/api/nurse/supplies', { method:'POST', body: JSON.stringify(body) });
+      toast('Позиция добавлена');
+    }
+    closeModal('modal-supply');
+    loadSupplies();
+  } catch (_) {}
+}
+
+function openAdjust(id, name, current) {
+  document.getElementById('adjust-id').value      = id;
+  document.getElementById('adjust-name').textContent = name;
+  document.getElementById('adjust-current').textContent = current;
+  document.getElementById('adjust-delta').value   = '0';
+  openModal('modal-adjust');
+}
+
+async function doAdjust() {
+  const id    = document.getElementById('adjust-id').value;
+  const delta = parseInt(document.getElementById('adjust-delta').value) || 0;
+  if (delta === 0) { toast('Укажите ненулевое изменение', 'warning'); return; }
+  try {
+    await apiFetch(`/api/nurse/supplies/${id}/adjust`, { method:'PATCH', body: JSON.stringify({ delta }) });
+    toast('Остаток обновлён');
+    closeModal('modal-adjust');
+    loadSupplies();
+    if (currentSection === 'dashboard') loadDashboard();
+  } catch (_) {}
+}
+
+async function deleteSupply(id) {
+  if (!confirm('Удалить позицию со склада?')) return;
+  try {
+    await apiFetch(`/api/nurse/supplies/${id}`, { method:'DELETE' });
+    toast('Позиция удалена');
+    loadSupplies();
+  } catch (_) {}
+}
+
+// ── Assignments ──
+async function loadAssignments() {
+  const status = document.getElementById('assign-status-filter')?.value || '';
+  const url = status ? `/api/nurse/assignments?status=${status}` : '/api/nurse/assignments';
+  const data = await apiFetch(url);
+  if (!data) return;
+
+  document.getElementById('assignments-table').innerHTML = data.length === 0
+    ? '<tr><td colspan="8" style="text-align:center;padding:24px">Назначений нет</td></tr>'
+    : data.map(a => `<tr>
+        <td><strong>#${a.id}</strong></td>
+        <td>${esc(a.clientName)}</td>
+        <td>${esc(a.procedureTypeLabel)}</td>
+        <td>${esc(a.title)}</td>
+        <td>${esc(a.dosage)}</td>
+        <td>${a.scheduledDate ? a.scheduledDate + (a.scheduledTime ? ' ' + a.scheduledTime.slice(0,5) : '') : '—'}</td>
+        <td>${statusBadge(a.status)}</td>
+        <td>
+          ${a.status === 'ACTIVE' ? `
+            <button class="btn btn-sm" style="background:#dcfce7;color:#16a34a;border:1px solid #86efac" onclick="changeStatus(${a.id},'DONE')" title="Отметить выполненным"><i class="fa fa-check"></i></button>
+            <button class="btn btn-sm" style="background:#f9fafb;color:#6b7280;border:1px solid #d1d5db" onclick="changeStatus(${a.id},'CANCELLED')" title="Отменить"><i class="fa fa-xmark"></i></button>
+          ` : ''}
+          <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5" onclick="deleteAssignment(${a.id})"><i class="fa fa-trash"></i></button>
+        </td>
+      </tr>`).join('');
+}
+
+let clientSearchTimer = null;
+async function searchClients() {
+  clearTimeout(clientSearchTimer);
+  const q = document.getElementById('assign-client-search').value.trim();
+  const results = document.getElementById('client-results');
+  if (q.length < 2) { results.style.display = 'none'; return; }
+
+  clientSearchTimer = setTimeout(async () => {
+    try {
+      const data = await apiFetch(`/api/patients?size=20&page=0`);
+      // Filter users with clientUser by matching name
+      // We search patients that have clientUserId and match fullName
+      const allUsers = await apiFetch(`/api/patients/search?q=${encodeURIComponent(q)}&size=20`);
+      const matched = (allUsers?.content || []).filter(p => p.clientUserId);
+      if (matched.length === 0) {
+        results.style.display = 'block';
+        results.innerHTML = '<div class="result-item" style="color:#64748b;cursor:default">Клиентов не найдено (нужен аккаунт на портале)</div>';
+        return;
+      }
+      results.style.display = 'block';
+      results.innerHTML = matched.map(p =>
+        `<div class="result-item" onclick="selectClient(${p.clientUserId},'${esc(p.fullName)}')">${esc(p.fullName)}</div>`
+      ).join('');
+    } catch (_) { results.style.display = 'none'; }
+  }, 300);
+}
+
+function selectClient(userId, name) {
+  document.getElementById('assign-client-id').value = userId;
+  document.getElementById('assign-client-search').value = name;
+  document.getElementById('client-results').style.display = 'none';
+}
+
+function openCreateAssignmentModal() {
+  document.getElementById('assign-client-id').value     = '';
+  document.getElementById('assign-client-search').value = '';
+  document.getElementById('client-results').style.display = 'none';
+  document.getElementById('assign-type').value    = 'INJECTION';
+  document.getElementById('assign-title').value   = '';
+  document.getElementById('assign-dosage').value  = '';
+  document.getElementById('assign-date').value    = '';
+  document.getElementById('assign-time').value    = '';
+  document.getElementById('assign-desc').value    = '';
+  openModal('modal-assignment');
+}
+
+async function saveAssignment() {
+  const clientUserId = document.getElementById('assign-client-id').value;
+  if (!clientUserId) { toast('Выберите клиента из списка', 'warning'); return; }
+  const title = document.getElementById('assign-title').value.trim();
+  if (!title) { toast('Введите название процедуры', 'warning'); return; }
+
+  const body = {
+    clientUserId: parseInt(clientUserId),
+    procedureType: document.getElementById('assign-type').value,
+    title,
+    description: document.getElementById('assign-desc').value.trim() || null,
+    dosage:       document.getElementById('assign-dosage').value.trim() || null,
+    scheduledDate: document.getElementById('assign-date').value  || null,
+    scheduledTime: document.getElementById('assign-time').value  ? document.getElementById('assign-time').value + ':00' : null,
+  };
+  try {
+    await apiFetch('/api/nurse/assignments', { method:'POST', body: JSON.stringify(body) });
+    toast('Назначение создано');
+    closeModal('modal-assignment');
+    loadAssignments();
+  } catch (_) {}
+}
+
+async function changeStatus(id, status) {
+  try {
+    await apiFetch(`/api/nurse/assignments/${id}/status?status=${status}`, { method:'PATCH' });
+    toast(status === 'DONE' ? 'Отмечено выполненным' : 'Назначение отменено');
+    loadAssignments();
+    if (currentSection === 'dashboard') loadDashboard();
+  } catch (_) {}
+}
+
+async function deleteAssignment(id) {
+  if (!confirm('Удалить назначение?')) return;
+  try {
+    await apiFetch(`/api/nurse/assignments/${id}`, { method:'DELETE' });
+    toast('Назначение удалено');
+    loadAssignments();
   } catch (_) {}
 }
 
@@ -338,7 +784,7 @@ function debouncedSearch() {
 async function loadPatients(page = 0) {
   patientsPage = page;
   const q      = document.getElementById('patient-search')?.value?.trim() || '';
-  const status = document.getElementById('patient-status-filter')?.value  || '';
+  const status = document.getElementById('patient-status-filter')?.value || '';
   let data;
   if (q || status) {
     const params = new URLSearchParams({ page, size: 15 });
@@ -351,20 +797,18 @@ async function loadPatients(page = 0) {
   if (!data) return;
 
   document.getElementById('patients-table').innerHTML = data.content.length === 0
-    ? `<tr><td colspan="6" style="text-align:center;padding:24px">Пациентов не найдено</td></tr>`
-    : data.content.map(p => `
-        <tr>
-          <td><strong>#${p.id}</strong></td>
-          <td>${escHtml(p.fullName)}</td>
-          <td>${escHtml(p.snils)}</td>
-          <td>${statusBadge(p.status)}</td>
-          <td>${escHtml(p.currentDoctorName)}</td>
-          <td>${escHtml(p.currentWardNumber)}</td>
-        </tr>`).join('');
+    ? '<tr><td colspan="6" style="text-align:center;padding:24px">Пациентов не найдено</td></tr>'
+    : data.content.map(p => `<tr>
+        <td><strong>#${p.id}</strong></td>
+        <td>${esc(p.fullName)}</td>
+        <td>${esc(p.snils)}</td>
+        <td>${statusBadge(p.status)}</td>
+        <td>${esc(p.currentDoctorName)}</td>
+        <td>${esc(p.currentWardNumber)}</td>
+      </tr>`).join('');
 
   buildPagination('patients-pagination', data, 'loadPatients');
 }
-
 window.loadPatients = loadPatients;
 
 // ── Wards ──
@@ -373,19 +817,18 @@ async function loadWards() {
   if (!data) return;
 
   document.getElementById('wards-table').innerHTML = data.length === 0
-    ? `<tr><td colspan="5" style="text-align:center;padding:24px">Палат нет</td></tr>`
-    : data.map(w => `
-        <tr>
-          <td><strong>#${w.id}</strong></td>
-          <td>${escHtml(w.wardNumber)}</td>
-          <td>${escHtml(w.departmentName)}</td>
-          <td>${occupancyBar(w.currentOccupancy, w.capacity)}</td>
-          <td>
-            <button class="btn btn-primary btn-sm" onclick="openAdmitModal(${w.id},'${escHtml(w.wardNumber)}',${w.freeSlots})">
-              + Заселить
-            </button>
-          </td>
-        </tr>`).join('');
+    ? '<tr><td colspan="5" style="text-align:center;padding:24px">Палат нет</td></tr>'
+    : data.map(w => `<tr>
+        <td><strong>#${w.id}</strong></td>
+        <td>${esc(w.wardNumber)}</td>
+        <td>${esc(w.departmentName)}</td>
+        <td>${occupancyBar(w.currentOccupancy, w.capacity)}</td>
+        <td>
+          <button class="btn btn-primary btn-sm" onclick="openAdmitModal(${w.id},'${esc(w.wardNumber)}',${w.freeSlots})">
+            + Заселить
+          </button>
+        </td>
+      </tr>`).join('');
 }
 
 async function openAdmitModal(wardId, wardNumber, freeSlots) {
@@ -396,8 +839,8 @@ async function openAdmitModal(wardId, wardNumber, freeSlots) {
   if (!patients) return;
   const unassigned = patients.content.filter(p => p.status === 'TREATMENT' && !p.currentWardNumber);
   document.getElementById('admit-patientId').innerHTML = unassigned.length === 0
-    ? `<option value="">Нет доступных пациентов</option>`
-    : unassigned.map(p => `<option value="${p.id}">${escHtml(p.fullName)}</option>`).join('');
+    ? '<option value="">Нет доступных пациентов</option>'
+    : unassigned.map(p => `<option value="${p.id}">${esc(p.fullName)}</option>`).join('');
   openModal('modal-admit');
 }
 
@@ -406,33 +849,12 @@ async function doAdmit() {
   const patientId = document.getElementById('admit-patientId').value;
   if (!patientId) { toast('Выберите пациента', 'warning'); return; }
   try {
-    await apiFetch(`/api/wards/${wardId}/admit/${patientId}`, { method: 'POST' });
+    await apiFetch(`/api/wards/${wardId}/admit/${patientId}`, { method:'POST' });
     toast('Пациент заселён');
     closeModal('modal-admit');
     loadWards();
   } catch (_) {}
 }
-
-// ── Services ──
-async function loadServices(page = 0) {
-  servicesPage = page;
-  const data = await apiFetch(`/api/paid-services?page=${page}&size=15`);
-  if (!data) return;
-
-  document.getElementById('services-table').innerHTML = data.content.length === 0
-    ? `<tr><td colspan="4" style="text-align:center;padding:24px">Услуг нет</td></tr>`
-    : data.content.map(s => `
-        <tr>
-          <td><strong>#${s.id}</strong></td>
-          <td>${escHtml(s.name)}</td>
-          <td><strong>${s.price} ₽</strong></td>
-          <td>${activeBadge(s.active)}</td>
-        </tr>`).join('');
-
-  buildPagination('services-pagination', data, 'loadServices');
-}
-
-window.loadServices = loadServices;
 </script>
 </body>
 </html>

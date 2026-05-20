@@ -175,6 +175,9 @@ public class SecurityConfig {
                 .requestMatchers(org.springframework.http.HttpMethod.GET,
                         "/api/medical/documents/my", "/api/medical/history/my").hasRole("CLIENT")
 
+                // Модуль медсестры: склад и назначения
+                .requestMatchers("/api/nurse/**").hasRole("NURSE")
+
                 /**
                  * hasRole("ADMIN") — требует роль ADMIN у аутентифицированного пользователя.
                  */

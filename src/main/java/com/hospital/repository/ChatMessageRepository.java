@@ -2,6 +2,7 @@ package com.hospital.repository;
 
 import com.hospital.entity.ChatMessage;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -74,4 +75,9 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
      */
     @Query("SELECT COUNT(m) FROM ChatMessage m WHERE m.room.id = :roomId AND m.read = false AND m.sender.id <> :userId")
     long countUnread(@Param("roomId") Long roomId, @Param("userId") Long userId);
+
+    /** Помечает все непрочитанные сообщения от других участников как прочитанные. */
+    @Modifying
+    @Query("UPDATE ChatMessage m SET m.read = true WHERE m.room.id = :roomId AND m.sender.id <> :userId AND m.read = false")
+    void markMessagesAsRead(@Param("roomId") Long roomId, @Param("userId") Long userId);
 }

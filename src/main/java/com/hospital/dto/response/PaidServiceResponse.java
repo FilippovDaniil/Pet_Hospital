@@ -45,4 +45,6 @@ public class PaidServiceResponse {
      * но её история в {@code PatientPaidService} сохраняется.
      */
     private boolean active;
+
+    private int slotMinutes;
 }

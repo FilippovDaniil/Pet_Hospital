@@ -4,6 +4,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+
 @Data
 public class ServiceOrderRequest {
 
@@ -14,4 +17,8 @@ public class ServiceOrderRequest {
     private String contactPhone;
 
     private String notes;
+
+    private LocalDate preferredDate;
+
+    private LocalTime preferredTime;
 }

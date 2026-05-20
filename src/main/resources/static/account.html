@@ -231,6 +231,9 @@ input,select,textarea{font-family:inherit}
       <button class="nav-item" onclick="navigate('history')" data-page="history">
         <span class="nav-icon">📋</span> История болезни
       </button>
+      <button class="nav-item" onclick="navigate('assignments')" data-page="assignments">
+        <span class="nav-icon">💉</span> Назначения
+      </button>
       <button class="nav-item" onclick="navigate('support')" data-page="support">
         <span class="nav-icon">💬</span> Поддержка
         <span class="nav-badge" id="badge-support" style="display:none">0</span>
@@ -267,6 +270,7 @@ input,select,textarea{font-family:inherit}
           <div class="stat-card"><div class="stat-num" id="ov-orders">—</div><div class="stat-label">Заказов услуг</div></div>
           <div class="stat-card"><div class="stat-num" id="ov-docs">—</div><div class="stat-label">Медицинских документов</div></div>
           <div class="stat-card"><div class="stat-num" id="ov-notes">—</div><div class="stat-label">Записей в истории</div></div>
+          <div class="stat-card" style="cursor:pointer" onclick="navigate('assignments')"><div class="stat-num" id="ov-assignments">—</div><div class="stat-label">Активных назначений</div></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
           <div class="card">
@@ -349,6 +353,12 @@ input,select,textarea{font-family:inherit}
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- ════ ASSIGNMENTS ════ -->
+      <div class="page" id="page-assignments">
+        <p style="color:var(--muted);font-size:.875rem;margin-bottom:16px">Процедуры и назначения от медицинского персонала.</p>
+        <div id="assignments-list"><div class="empty-state"><span class="spinner"></span> Загрузка…</div></div>
       </div>
 
     </div><!-- /content -->
@@ -466,6 +476,7 @@ function updateSidebarProfile() {
 const pageNames = {
   overview:'Сводка', appointments:'Записи к врачу', orders:'Заказы услуг',
   documents:'Медицинские документы', history:'История болезни',
+  assignments:'Назначения медсестры',
   support:'Служба поддержки', chats:'Чат с врачом'
 };
 
@@ -483,6 +494,7 @@ function navigate(page) {
   if (page === 'orders')        loadOrders();
   if (page === 'documents')     loadDocuments();
   if (page === 'history')       loadHistory();
+  if (page === 'assignments')   loadAssignments();
   if (page === 'support')       loadSupportChat();
   if (page === 'chats')         loadDoctorChats();
 }
@@ -492,16 +504,18 @@ function reloadCurrentPage() { navigate(currentPage); }
 // ── Overview ──
 async function loadOverview() {
   try {
-    const [appts, orders, docs, hist] = await Promise.all([
+    const [appts, orders, docs, hist, assigns] = await Promise.all([
       api('/api/client/appointments/my'),
       api('/api/client/service-orders/my'),
       api('/api/medical/documents/my').catch(() => []),
       api('/api/medical/history/my').catch(() => ({notes:[],documents:[]})),
+      api('/api/client/my-assignments').catch(() => []),
     ]);
     document.getElementById('ov-appts').textContent  = appts.length;
     document.getElementById('ov-orders').textContent = orders.length;
     document.getElementById('ov-docs').textContent   = (docs||[]).length;
     document.getElementById('ov-notes').textContent  = (hist?.notes||[]).length;
+    document.getElementById('ov-assignments').textContent = (assigns||[]).filter(a => a.status==='ACTIVE').length;
     renderApptsMini(appts.slice(0,4), 'ov-recent-appts');
     renderOrdersMini(orders.slice(0,4), 'ov-recent-orders');
     renderDocsMini((docs||[]).slice(0,3), 'ov-recent-docs');
@@ -579,6 +593,35 @@ function renderOrdersMini(orders, id) {
       <div class="item-sub">💰 ${fmtPrice(o.servicePrice)} ₽ &nbsp; 📅 ${fmtDate(o.createdAt)}</div>
       <span class="status-badge status-${o.status}">${statusLabel(o.status)}</span>
     </div>`).join('');
+}
+
+// ── Assignments ──
+async function loadAssignments() {
+  const el = document.getElementById('assignments-list');
+  el.innerHTML = '<div class="empty-state"><span class="spinner"></span> Загрузка…</div>';
+  try {
+    const data = await api('/api/client/my-assignments');
+    if (!data.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-icon">💉</div>Назначений нет</div>';
+      return;
+    }
+    const statusLabel = { ACTIVE:'Активно', DONE:'Выполнено', CANCELLED:'Отменено' };
+    const typeLabel   = { INJECTION:'Укол', PILL:'Приём таблеток', DRESSING:'Перевязка', PROCEDURE:'Процедура', OTHER:'Прочее' };
+    const statusColor = { ACTIVE:'#2563eb', DONE:'#16a34a', CANCELLED:'#6b7280' };
+    el.innerHTML = data.map(a => `
+      <div class="list-item" style="margin-bottom:8px">
+        <div class="flex-between">
+          <div>
+            <div class="item-title">💉 ${esc(a.title)}</div>
+            <div class="item-sub">${typeLabel[a.procedureType] || a.procedureType} · Медсестра: ${esc(a.nurseName)}</div>
+            ${a.dosage ? `<div class="item-sub">Доза: ${esc(a.dosage)}</div>` : ''}
+            ${a.scheduledDate ? `<div class="item-sub">📅 ${a.scheduledDate}${a.scheduledTime ? ' ' + a.scheduledTime.slice(0,5) : ''}</div>` : ''}
+            ${a.description ? `<div class="item-sub" style="font-style:italic;margin-top:4px">${esc(a.description)}</div>` : ''}
+          </div>
+          <span class="status-badge" style="background:${statusColor[a.status]||'#64748b'}1a;color:${statusColor[a.status]||'#64748b'};border:1px solid ${statusColor[a.status]||'#64748b'}40">${statusLabel[a.status]||a.status}</span>
+        </div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; }
 }
 
 // ── Documents ──

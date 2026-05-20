@@ -63,6 +63,7 @@ public class ClientServiceImpl implements ClientService {
                         .name(s.getName())
                         .description(s.getDescription())
                         .price(s.getPrice())
+                        .slotMinutes(s.getSlotMinutes())
                         .active(true)
                         .build())
                 .toList();
@@ -112,6 +113,8 @@ public class ClientServiceImpl implements ClientService {
                 .paidService(service)
                 .contactPhone(request.getContactPhone())
                 .notes(request.getNotes())
+                .preferredDate(request.getPreferredDate())
+                .preferredTime(request.getPreferredTime())
                 .status(ClientServiceOrderStatus.PENDING)
                 .build();
 
@@ -155,6 +158,8 @@ public class ClientServiceImpl implements ClientService {
                 .servicePrice(o.getPaidService().getPrice())
                 .contactPhone(o.getContactPhone())
                 .notes(o.getNotes())
+                .preferredDate(o.getPreferredDate())
+                .preferredTime(o.getPreferredTime())
                 .status(o.getStatus().name())
                 .createdAt(o.getCreatedAt())
                 .build();

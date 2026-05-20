@@ -453,7 +453,17 @@ select.form-control { cursor:pointer; }
     <div class="modal-body">
       <form id="form-order" onsubmit="doOrder(event)">
         <input type="hidden" id="order-service-id">
+        <input type="hidden" id="order-slot-minutes" value="60">
         <div class="form-group"><label class="form-label">Услуга</label><input class="form-control" id="order-service-name" readonly style="background:var(--bg)"></div>
+        <div class="form-group"><label class="form-label">Желаемая дата (необязательно)</label>
+          <input class="form-control" type="date" id="order-date" onchange="onOrderDateChange()">
+          <div class="form-hint">Только рабочие дни (пн–пт), начиная с завтра</div>
+        </div>
+        <div class="form-group" id="order-time-group" style="display:none"><label class="form-label">Удобное время (необязательно)</label>
+          <select class="form-control" id="order-time">
+            <option value="">— Любое —</option>
+          </select>
+        </div>
         <div class="form-group"><label class="form-label">Телефон для связи</label><input class="form-control" type="tel" id="order-phone" placeholder="+7 (___) ___-__-__"></div>
         <div class="form-group"><label class="form-label">Комментарий (необязательно)</label><textarea class="form-control" id="order-notes" rows="2" placeholder="Пожелания, удобное время…"></textarea></div>
         <div class="form-error" id="order-error"></div>
@@ -737,22 +747,77 @@ async function doBook(e) {
 
 function openOrderForService(serviceId, serviceName) {
   if (!token) { openModal('login'); toast('Войдите, чтобы заказать услугу', 'info'); return; }
+  const svc = allServices.find(s => s.id === serviceId);
+  const slotMinutes = (svc && svc.slotMinutes) ? svc.slotMinutes : 60;
   document.getElementById('order-service-id').value = serviceId;
   document.getElementById('order-service-name').value = serviceName;
+  document.getElementById('order-slot-minutes').value = slotMinutes;
+  // set min date = tomorrow
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const minDate = tomorrow.toISOString().split('T')[0];
+  const dateInput = document.getElementById('order-date');
+  dateInput.min = minDate;
+  dateInput.value = '';
+  document.getElementById('order-time-group').style.display = 'none';
+  document.getElementById('order-time').innerHTML = '<option value="">— Любое —</option>';
   openModal('order');
+}
+
+function onOrderDateChange() {
+  const dateInput = document.getElementById('order-date');
+  const dateVal = dateInput.value;
+  const errEl = document.getElementById('order-error');
+  errEl.style.display = 'none';
+  if (!dateVal) {
+    document.getElementById('order-time-group').style.display = 'none';
+    return;
+  }
+  if (isWeekend(dateVal)) {
+    errEl.textContent = 'Выберите рабочий день (пн–пт). Выходные не доступны.';
+    errEl.style.display = 'block';
+    dateInput.value = '';
+    document.getElementById('order-time-group').style.display = 'none';
+    return;
+  }
+  const slotMinutes = parseInt(document.getElementById('order-slot-minutes').value, 10) || 60;
+  const timeSelect = document.getElementById('order-time');
+  timeSelect.innerHTML = '<option value="">— Любое —</option>';
+  // generate slots from 10:00 to 19:00 exclusive (last slot start <= 18:00 for 60min, <= 18:30 for 30min)
+  const startMinutes = 10 * 60; // 10:00
+  const endMinutes = 19 * 60;   // 19:00 (exclusive start)
+  for (let m = startMinutes; m + slotMinutes <= endMinutes; m += slotMinutes) {
+    const hh = String(Math.floor(m / 60)).padStart(2, '0');
+    const mm = String(m % 60).padStart(2, '0');
+    const opt = document.createElement('option');
+    opt.value = hh + ':' + mm + ':00';
+    opt.textContent = hh + ':' + mm;
+    timeSelect.appendChild(opt);
+  }
+  document.getElementById('order-time-group').style.display = 'block';
 }
 
 async function doOrder(e) {
   e.preventDefault();
   const errEl = document.getElementById('order-error'); errEl.style.display = 'none';
+  const dateVal = document.getElementById('order-date').value || null;
+  if (dateVal && isWeekend(dateVal)) {
+    errEl.textContent = 'Нельзя выбрать выходной день. Выберите рабочий день (пн–пт).';
+    errEl.style.display = 'block';
+    return;
+  }
+  const timeVal = document.getElementById('order-time').value || null;
   try {
     await api('/api/client/service-orders', 'POST', {
-      serviceId:    +document.getElementById('order-service-id').value,
-      contactPhone: document.getElementById('order-phone').value || null,
-      notes:        document.getElementById('order-notes').value || null,
+      serviceId:     +document.getElementById('order-service-id').value,
+      contactPhone:  document.getElementById('order-phone').value || null,
+      notes:         document.getElementById('order-notes').value || null,
+      preferredDate: dateVal,
+      preferredTime: timeVal,
     });
     closeModal('order');
     document.getElementById('form-order').reset();
+    document.getElementById('order-time-group').style.display = 'none';
     toast('Заказ оформлен! Мы свяжемся с вами.', 'success');
   } catch(err) { errEl.textContent = err.message; errEl.style.display = 'block'; }
 }

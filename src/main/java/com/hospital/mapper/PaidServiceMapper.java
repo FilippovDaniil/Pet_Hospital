@@ -44,6 +44,7 @@ public interface PaidServiceMapper {
      */
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "active", ignore = true)
+    @Mapping(target = "slotMinutes", source = "slotMinutes")
     PaidService toEntity(CreatePaidServiceRequest request);
 
     /**

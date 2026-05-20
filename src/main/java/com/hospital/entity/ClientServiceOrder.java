@@ -3,7 +3,9 @@ package com.hospital.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "client_service_order")
@@ -30,6 +32,12 @@ public class ClientServiceOrder {
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
+
+    @Column(name = "preferred_date")
+    private LocalDate preferredDate;
+
+    @Column(name = "preferred_time")
+    private LocalTime preferredTime;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
