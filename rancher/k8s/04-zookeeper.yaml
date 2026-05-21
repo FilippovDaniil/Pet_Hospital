@@ -1,0 +1,59 @@
+# =============================================================
+# 04-zookeeper.yaml — Apache ZooKeeper: координатор для Kafka
+# =============================================================
+# ZooKeeper — распределённый сервис координации, который Kafka
+# использует для:
+#   - хранения метаданных брокеров и топиков
+#   - выбора лидера партиций
+#   - отслеживания живых брокеров (Kafka Broker Registry)
+#
+# Порядок запуска КРИТИЧЕН:
+#   ZooKeeper → Kafka → Kafdrop + App
+# Kafka не запустится без ZooKeeper. Поэтому в 05-kafka.yaml
+# есть initContainer, который ждёт порт 2181.
+#
+# ПРИМЕЧАНИЕ: Kafka 4.x планирует отказаться от ZooKeeper в пользу
+# KRaft (встроенный Raft-консенсус). Confluent 7.6 ещё использует ZK.
+# =============================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zookeeper
+  namespace: pet-hospital
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zookeeper
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      containers:
+        - name: zookeeper
+          image: confluentinc/cp-zookeeper:7.6.0  # Confluent Platform ZooKeeper
+          ports:
+            - containerPort: 2181  # Стандартный порт ZooKeeper для клиентских подключений
+          env:
+            - name: ZOOKEEPER_CLIENT_PORT
+              value: "2181"        # Порт для Kafka-клиентов (= containerPort выше)
+            - name: ZOOKEEPER_TICK_TIME
+              value: "2000"        # Базовая единица времени в мс (таймауты = N * tickTime)
+
+---
+# Service: Kafka подключается к ZooKeeper через имя "zookeeper:2181"
+# Это имя фигурирует в переменной KAFKA_ZOOKEEPER_CONNECT в 05-kafka.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper              # DNS-имя — совпадает с docker-compose service name
+  namespace: pet-hospital
+spec:
+  selector:
+    app: zookeeper
+  ports:
+    - port: 2181
+      targetPort: 2181
+  type: ClusterIP              # ZooKeeper нужен только Kafka — внешний доступ не нужен

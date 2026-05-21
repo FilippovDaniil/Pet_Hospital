@@ -1,0 +1,184 @@
+# =============================================================
+# 10-app.yaml — Pet Hospital приложение (Spring Boot)
+# =============================================================
+# Основной сервис. Зависит от PostgreSQL, Redis, Kafka и Loki.
+#
+# Ключевые механизмы:
+#
+# 1. initContainers (4 штуки) — ждут всех зависимостей перед стартом.
+#    Без них Spring Boot начнёт инициализацию и упадёт с
+#    "Connection refused" в CrashLoopBackOff.
+#
+# 2. imagePullPolicy: Never — ОБЯЗАТЕЛЬНО для Rancher Desktop!
+#    Образ не тянется из registry, используется тот что загружен в VM.
+#    Если пропустить — ErrImageNeverPull или попытка тянуть из Docker Hub.
+#
+# 3. envFrom + env — конфиг из ConfigMap + секрет отдельно.
+#    Пароль приходит из Secret, остальное из ConfigMap.
+#
+# 4. readinessProbe (initialDelay=30) — Spring Boot с Flyway, Kafka и
+#    Redis стартует ~25-40 секунд. Пока probe не пройдёт — Service
+#    не направляет трафик на Pod.
+#
+# 5. livenessProbe (initialDelay=90) — БОЛЬШЕ чем readiness!
+#    Если livenessProbe срабатывает раньше чем приложение успело
+#    запуститься, K8s перезапускает Pod → CrashLoopBackOff.
+#
+# Образ собирается командой:
+#   docker build --provenance=false -t pet-hospital:1.0.0 .
+# =============================================================
+
+# --- РЕСУРС 1: ConfigMap — несекретные переменные окружения ---
+# Все строки URL и адресов сервисов используют K8s DNS-имена Services.
+# DNS-имя в K8s = metadata.name Service в том же namespace.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hospital-app-config
+  namespace: pet-hospital
+data:
+  # Подключение к PostgreSQL через K8s Service "postgres" (02-postgres.yaml)
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/hospital_db"
+  SPRING_DATASOURCE_USERNAME: "postgres"
+  # Пароль НЕ здесь — он в Secret и передаётся через env.secretKeyRef ниже
+
+  # Redis через K8s Service "redis" (03-redis.yaml)
+  SPRING_DATA_REDIS_HOST: "redis"
+  SPRING_DATA_REDIS_PORT: "6379"
+
+  # Kafka через K8s Service "kafka" (05-kafka.yaml)
+  # Используем внутренний listener :29092 (не :9092)
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+
+  # Loki для логов через K8s Service "loki" (07-loki.yaml)
+  # logback-spring.xml читает это значение: ${LOKI_URL:http://localhost:3100}
+  LOKI_URL: "http://loki:3100"
+
+  # Отключаем mail health indicator (без SMTP → HealthIndicator=DOWN → 503)
+  # При 503 readinessProbe постоянно падает → Pod бесконечно перезапускается
+  MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
+
+  # Показывать детали здоровья для диагностики через /actuator/health
+  MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: "always"
+
+---
+# --- РЕСУРС 2: Deployment ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hospital-app
+  namespace: pet-hospital
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hospital-app
+  template:
+    metadata:
+      labels:
+        app: hospital-app
+    spec:
+      # initContainers выполняются СТРОГО ПО ПОРЯДКУ, один за другим.
+      # Пока текущий не завершится с кодом 0 — следующий не стартует.
+      # Основной контейнер стартует только после того как ВСЕ init завершены.
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z postgres 5432; do sleep 2; done
+          # nc -z: проверяет TCP-соединение без отправки данных (zero I/O)
+          # Выполняется успешно (exit 0) когда порт открыт
+
+        - name: wait-for-redis
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z redis 6379; do sleep 2; done
+
+        - name: wait-for-kafka
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z kafka 29092; do sleep 2; done
+          # Kafka слушает на 29092 (PLAINTEXT listener для K8s)
+
+        - name: wait-for-loki
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z loki 3100; do sleep 2; done
+          # loki4j appender попытается отправить логи при старте приложения
+
+      containers:
+        - name: hospital-app
+          image: pet-hospital:1.0.0  # Имя образа — задаётся при docker build -t
+          imagePullPolicy: Never     # КРИТИЧНО для Rancher Desktop!
+          # Never = не искать в registry, только в локальном хранилище VM
+          # Образ загружается командой: rdctl shell -- docker load < app.tar
+
+          ports:
+            - containerPort: 8090   # Spring Boot server.port=8090
+
+          # envFrom загружает ВСЕ ключи из ConfigMap как переменные окружения.
+          # Удобно когда переменных много — не нужно перечислять каждую.
+          envFrom:
+            - configMapRef:
+                name: hospital-app-config
+
+          # env: отдельные переменные, не вошедшие в ConfigMap.
+          # Пароль берём из Secret через ссылку (не хардкодим).
+          env:
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pet-hospital-secrets  # Secret из 01-secrets.yaml
+                  key: postgres-password       # Ключ внутри Secret
+
+          # readinessProbe: когда Pod готов принимать HTTP-запросы?
+          # /actuator/health возвращает 200 когда все компоненты UP.
+          # Пока probe не пройдёт — Service не направляет трафик на этот Pod.
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8090
+            initialDelaySeconds: 30  # Spring Boot + Flyway migrations ~25-30 сек
+            periodSeconds: 10        # Проверять каждые 10 секунд
+            failureThreshold: 6      # 6 × 10 = 60 сек дополнительного времени на прогрев
+
+          # livenessProbe: Pod живой? Если нет — K8s перезапускает контейнер.
+          # ПРАВИЛО: initialDelaySeconds livenessProbe > readinessProbe + время прогрева
+          # Если liveness сработает раньше чем Spring Boot запустился →
+          # K8s убьёт Pod → Pod снова стартует → цикл = CrashLoopBackOff
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8090
+            initialDelaySeconds: 90  # Запас: 30 (init) + 60 (failThreshold) = 90
+            periodSeconds: 15
+            failureThreshold: 3      # Дать 3 попытки прежде чем убить Pod
+
+---
+# --- РЕСУРС 3: NodePort Service ---
+# Делает приложение доступным с хост-машины: http://localhost:30090
+# NodePort 30090: порт приложения 8090 → добавляем "3" = 30090
+#
+# Внутри кластера другие поды обращаются по hospital-app:8090.
+# Prometheus scrape target = hospital-app:8090 (из 08-prometheus.yaml).
+apiVersion: v1
+kind: Service
+metadata:
+  name: hospital-app            # DNS-имя для обращений внутри кластера
+  namespace: pet-hospital       # Prometheus использует это имя для scrape
+spec:
+  selector:
+    app: hospital-app           # Трафик идёт на поды с меткой app=hospital-app
+  ports:
+    - port: 8090                # Порт внутри кластера
+      targetPort: 8090          # Порт контейнера
+      nodePort: 30090           # Порт на хост-машине: http://localhost:30090
+  type: NodePort

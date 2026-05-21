@@ -1,0 +1,730 @@
+# =============================================================
+# 09-grafana.yaml — Grafana: визуализация логов и метрик
+# =============================================================
+# Grafana читает данные из двух источников:
+#   - Loki (логи)       → datasource url: http://loki:3100
+#   - Prometheus (метрики) → datasource url: http://prometheus:9090
+#
+# Автоматическая настройка при старте через provisioning:
+#   - /etc/grafana/provisioning/datasources/  → источники данных
+#   - /etc/grafana/provisioning/dashboards/   → провайдер дашбордов
+#   - /etc/grafana/provisioning/dashboards/json/ → JSON файлы дашбордов
+#
+# ПАТТЕРН МОНТИРОВАНИЯ (важно понять!):
+# В K8s нельзя смонтировать два ConfigMap в одну директорию —
+# второй перезатрёт первый. Поэтому:
+#   ConfigMap grafana-dashboard-config → /dashboards/ (содержит dashboards.yml)
+#   ConfigMap grafana-dashboards       → /dashboards/json/ (содержит *.json файлы)
+# В dashboards.yml прописан path: /dashboards/json — Grafana ищет JSON там.
+#
+# Доступ: http://localhost:30300  admin / admin
+# =============================================================
+
+# --- РЕСУРС 1: ConfigMap — источники данных (datasources) ---
+# Grafana автоматически добавит эти datasources при старте,
+# не нужно вручную настраивать в UI.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: pet-hospital
+data:
+  # Ключи = имена файлов в /etc/grafana/provisioning/datasources/
+  loki.yml: |
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        uid: loki               # Уникальный ID — на него ссылаются панели дашбордов
+        access: proxy           # Grafana server проксирует запросы (не браузер напрямую)
+        url: http://loki:3100   # K8s DNS-имя Service Loki внутри namespace
+        isDefault: true         # Loki = datasource по умолчанию
+        editable: true
+
+  prometheus.yml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        uid: prometheus         # Уникальный ID — на него ссылаются панели дашбордов
+        access: proxy
+        url: http://prometheus:9090  # K8s DNS-имя Service Prometheus
+        isDefault: false
+        editable: true
+        jsonData:
+          timeInterval: '15s'   # Минимальный интервал запросов = scrape_interval
+
+---
+# --- РЕСУРС 2: ConfigMap — провайдер дашбордов ---
+# Описывает ГДЕ искать JSON-файлы дашбордов.
+# path указывает на подпапку /json — там лежат файлы из ConfigMap grafana-dashboards.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-config
+  namespace: pet-hospital
+data:
+  dashboards.yml: |
+    apiVersion: 1
+    providers:
+      - name: 'Pet Hospital'
+        orgId: 1
+        folder: 'Pet Hospital'    # Папка в Grafana UI
+        type: file                # Тип провайдера — файловая система
+        disableDeletion: false
+        updateIntervalSeconds: 10 # Проверять обновления файлов каждые 10 секунд
+        allowUiUpdates: true
+        options:
+          path: /etc/grafana/provisioning/dashboards/json  # ПОДПАПКА для JSON файлов!
+          # Не /dashboards/ — там лежит только dashboards.yml,
+          # и второй ConfigMap не перезатрёт этот файл.
+
+---
+# --- РЕСУРС 3: ConfigMap — JSON файлы дашбордов ---
+# Дашборды экспортированы из Grafana UI → Settings → JSON Model.
+# Grafana автоматически загрузит их при старте.
+# uid в JSON должен быть уникальным в Grafana (pet-hospital-logs, pet-hospital-metrics).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: pet-hospital
+data:
+  logs.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "description": "Логи приложения Pet Hospital (Loki)",
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 1, "fillOpacity": 10 }
+            },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "ERROR" }, "properties": [{ "id": "color", "value": { "fixedColor": "#e02f44", "mode": "fixed" } }] },
+              { "matcher": { "id": "byName", "options": "WARN" },  "properties": [{ "id": "color", "value": { "fixedColor": "#ff9830", "mode": "fixed" } }] },
+              { "matcher": { "id": "byName", "options": "INFO" },  "properties": [{ "id": "color", "value": { "fixedColor": "#5794f2", "mode": "fixed" } }] }
+            ]
+          },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+          "id": 1,
+          "options": {
+            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "loki" },
+              "editorMode": "code",
+              "expr": "sum by (level) (count_over_time({app=\"pet-hospital\"}[$__interval]))",
+              "legendFormat": "{{level}}",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "title": "Объём логов по уровню",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "gridPos": { "h": 20, "w": 24, "x": 0, "y": 8 },
+          "id": 2,
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": false,
+            "showCommonLabels": false,
+            "showLabels": true,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "loki" },
+              "editorMode": "code",
+              "expr": "{app=\"pet-hospital\"}",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "title": "Все логи",
+          "type": "logs"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "gridPos": { "h": 14, "w": 24, "x": 0, "y": 28 },
+          "id": 3,
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": false,
+            "showCommonLabels": false,
+            "showLabels": true,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "loki" },
+              "editorMode": "code",
+              "expr": "{app=\"pet-hospital\", level=\"ERROR\"}",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "title": "Только ошибки (ERROR)",
+          "type": "logs"
+        }
+      ],
+      "refresh": "10s",
+      "schemaVersion": 38,
+      "tags": ["pet-hospital", "logs"],
+      "templating": { "list": [] },
+      "time": { "from": "now-1h", "to": "now" },
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Pet Hospital — Logs",
+      "uid": "pet-hospital-logs",
+      "version": 1,
+      "weekStart": ""
+    }
+  metrics.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "description": "JVM и HTTP метрики Pet Hospital (Prometheus)",
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "id": 10,
+          "title": "HTTP",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+          "id": 1,
+          "options": {
+            "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "editorMode": "code",
+              "expr": "sum by (uri, method) (rate(http_server_requests_seconds_count{job=\"pet-hospital\"}[1m]))",
+              "legendFormat": "{{method}} {{uri}}",
+              "refId": "A"
+            }
+          ],
+          "title": "HTTP Request Rate (req/s)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+          "id": 2,
+          "options": {
+            "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.95, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job=\"pet-hospital\"}[1m])))",
+              "legendFormat": "p95 {{uri}}",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.99, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job=\"pet-hospital\"}[1m])))",
+              "legendFormat": "p99 {{uri}}",
+              "refId": "B"
+            }
+          ],
+          "title": "HTTP Response Time (p95 / p99)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "fixedColor": "#e02f44", "mode": "fixed" },
+              "custom": { "lineWidth": 2 },
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+          "id": 3,
+          "options": {
+            "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "editorMode": "code",
+              "expr": "sum by (uri) (rate(http_server_requests_seconds_count{job=\"pet-hospital\", status=~\"5..\"}[1m]))",
+              "legendFormat": "5xx {{uri}}",
+              "refId": "A"
+            }
+          ],
+          "title": "HTTP Errors 5xx (req/s)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 90 }
+                ]
+              },
+              "unit": "percent",
+              "min": 0,
+              "max": 100
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+          "id": 4,
+          "options": {
+            "minVizHeight": 75,
+            "minVizWidth": 75,
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "editorMode": "code",
+              "expr": "100 * sum(rate(http_server_requests_seconds_count{job=\"pet-hospital\", status=~\"5..\"}[5m])) / sum(rate(http_server_requests_seconds_count{job=\"pet-hospital\"}[5m]))",
+              "legendFormat": "Error Rate %",
+              "refId": "A"
+            }
+          ],
+          "title": "HTTP Error Rate % (5m)",
+          "type": "gauge"
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+          "id": 11,
+          "title": "JVM",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 85 }
+                ]
+              },
+              "unit": "percent",
+              "min": 0,
+              "max": 100
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 6, "x": 0, "y": 18 },
+          "id": 5,
+          "options": {
+            "minVizHeight": 75,
+            "minVizWidth": 75,
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "editorMode": "code",
+              "expr": "100 * sum(jvm_memory_used_bytes{job=\"pet-hospital\", area=\"heap\"}) / sum(jvm_memory_max_bytes{job=\"pet-hospital\", area=\"heap\"})",
+              "legendFormat": "Heap %",
+              "refId": "A"
+            }
+          ],
+          "title": "JVM Heap Used %",
+          "type": "gauge"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 9, "x": 6, "y": 18 },
+          "id": 6,
+          "options": {
+            "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "editorMode": "code",
+              "expr": "sum by (id) (jvm_memory_used_bytes{job=\"pet-hospital\"})",
+              "legendFormat": "{{id}}",
+              "refId": "A"
+            }
+          ],
+          "title": "JVM Memory Used (bytes)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 9, "x": 15, "y": 18 },
+          "id": 7,
+          "options": {
+            "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "editorMode": "code",
+              "expr": "jvm_threads_live_threads{job=\"pet-hospital\"}",
+              "legendFormat": "Live Threads",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "editorMode": "code",
+              "expr": "jvm_threads_daemon_threads{job=\"pet-hospital\"}",
+              "legendFormat": "Daemon Threads",
+              "refId": "B"
+            }
+          ],
+          "title": "JVM Threads",
+          "type": "timeseries"
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+          "id": 12,
+          "title": "System",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red", "value": 0.9 }
+                ]
+              },
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 27 },
+          "id": 8,
+          "options": {
+            "minVizHeight": 75,
+            "minVizWidth": 75,
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "editorMode": "code",
+              "expr": "process_cpu_usage{job=\"pet-hospital\"}",
+              "legendFormat": "CPU",
+              "refId": "A"
+            }
+          ],
+          "title": "Process CPU Usage",
+          "type": "gauge"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 27 },
+          "id": 9,
+          "options": {
+            "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "editorMode": "code",
+              "expr": "hikaricp_connections_active{job=\"pet-hospital\"}",
+              "legendFormat": "Active",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "editorMode": "code",
+              "expr": "hikaricp_connections_pending{job=\"pet-hospital\"}",
+              "legendFormat": "Pending",
+              "refId": "B"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "editorMode": "code",
+              "expr": "hikaricp_connections{job=\"pet-hospital\"}",
+              "legendFormat": "Total",
+              "refId": "C"
+            }
+          ],
+          "title": "DB Connection Pool (HikariCP)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 27 },
+          "id": 13,
+          "options": {
+            "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "editorMode": "code",
+              "expr": "jvm_gc_pause_seconds_sum{job=\"pet-hospital\"} / jvm_gc_pause_seconds_count{job=\"pet-hospital\"}",
+              "legendFormat": "Avg GC Pause {{action}} {{cause}}",
+              "refId": "A"
+            }
+          ],
+          "title": "GC Pause Time",
+          "type": "timeseries"
+        }
+      ],
+      "refresh": "15s",
+      "schemaVersion": 38,
+      "tags": ["pet-hospital", "metrics", "jvm"],
+      "templating": { "list": [] },
+      "time": { "from": "now-1h", "to": "now" },
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Pet Hospital — Metrics",
+      "uid": "pet-hospital-metrics",
+      "version": 1,
+      "weekStart": ""
+    }
+
+---
+# --- РЕСУРС 4: PersistentVolumeClaim ---
+# Grafana хранит на диске: SQLite БД (настройки, пользователи, плагины).
+# Данные сессий, алертов, аннотаций — всё в /var/lib/grafana.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-pvc
+  namespace: pet-hospital
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 256Mi            # SQLite + плагины занимают < 50 MB обычно
+
+---
+# --- РЕСУРС 5: Deployment ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: pet-hospital
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      # Ждём Loki и Prometheus перед стартом Grafana.
+      # Без этого datasources могут не пройти проверку при инициализации.
+      initContainers:
+        - name: wait-for-loki
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z loki 3100; do sleep 2; done
+        - name: wait-for-prometheus
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z prometheus 9090; do sleep 2; done
+
+      containers:
+        - name: grafana
+          image: grafana/grafana:10.2.3
+          ports:
+            - containerPort: 3000
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              value: "admin"              # Логин администратора
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: "admin"              # Пароль (для продакшена менять!)
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false"              # Запретить регистрацию новых пользователей
+            - name: GF_INSTALL_PLUGINS
+              value: ""                   # Дополнительные плагины (не нужны)
+
+          volumeMounts:
+            # ПОРЯДОК volumeMounts важен — описание паттерна:
+            - name: grafana-storage
+              mountPath: /var/lib/grafana             # PVC: SQLite и плагины
+
+            - name: grafana-datasources
+              mountPath: /etc/grafana/provisioning/datasources
+              # ConfigMap grafana-datasources → loki.yml и prometheus.yml
+
+            - name: grafana-dashboard-config
+              mountPath: /etc/grafana/provisioning/dashboards
+              # ConfigMap grafana-dashboard-config → только dashboards.yml
+              # (нельзя монтировать JSON сюда же — они бы скрыли dashboards.yml)
+
+            - name: grafana-dashboards
+              mountPath: /etc/grafana/provisioning/dashboards/json
+              # ConfigMap grafana-dashboards → logs.json и metrics.json
+              # Это ПОДПАПКА — не конфликтует с dashboards.yml выше
+              # dashboards.yml ищет файлы по пути /dashboards/json → находит их тут
+
+      volumes:
+        - name: grafana-storage
+          persistentVolumeClaim:
+            claimName: grafana-pvc
+        - name: grafana-datasources
+          configMap:
+            name: grafana-datasources
+        - name: grafana-dashboard-config
+          configMap:
+            name: grafana-dashboard-config
+        - name: grafana-dashboards
+          configMap:
+            name: grafana-dashboards
+
+---
+# --- РЕСУРС 6: Service с NodePort ---
+# NodePort 30300: 3000 → добавляем "30" спереди → 30300
+# Доступ: http://localhost:30300  (admin / admin)
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: pet-hospital
+spec:
+  selector:
+    app: grafana
+  ports:
+    - port: 3000
+      targetPort: 3000
+      nodePort: 30301           # 30300 занят namespace marketplace
+  type: NodePort

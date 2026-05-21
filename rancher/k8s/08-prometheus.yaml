@@ -1,0 +1,111 @@
+# =============================================================
+# 08-prometheus.yaml — Prometheus: сбор и хранение метрик
+# =============================================================
+# Prometheus работает по модели PULL: он сам периодически "скрейпит"
+# (опрашивает) HTTP-эндпоинты приложения и сохраняет метрики в TSDB.
+#
+# Spring Boot Actuator предоставляет метрики на:
+#   GET /actuator/prometheus  (формат OpenMetrics/Prometheus)
+#
+# Grafana читает метрики из Prometheus через datasource (настроен в 09-grafana.yaml).
+# Prometheus ТЯНЕТ метрики, Loki ПРИНИМАЕТ логи — разные парадигмы.
+#
+# ВАЖНО: scrape target = "hospital-app:8090"
+# Это имя K8s Service из 10-app.yaml. Prometheus резолвит его через K8s DNS.
+# =============================================================
+
+# --- РЕСУРС 1: ConfigMap с конфигурацией Prometheus ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: pet-hospital
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s      # Опрашивать таргеты каждые 15 секунд
+      evaluation_interval: 15s  # Оценивать правила алертинга каждые 15 секунд
+
+    scrape_configs:
+      - job_name: 'pet-hospital'            # Имя джоба — используется в метриках как label job=
+        metrics_path: '/actuator/prometheus' # Путь к эндпоинту метрик Spring Boot Actuator
+        scrape_interval: 10s                 # Для нашего сервиса — опрос каждые 10 секунд
+        static_configs:
+          - targets: ['hospital-app:8090']   # DNS-имя K8s Service приложения (из 10-app.yaml)
+            # Prometheus резолвит hospital-app через K8s DNS внутри namespace
+
+---
+# --- РЕСУРС 2: PersistentVolumeClaim ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-pvc
+  namespace: pet-hospital
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi              # 1 GB для 7 дней метрик с интервалом 10с
+
+---
+# --- РЕСУРС 3: Deployment ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: pet-hospital
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.51.0
+          ports:
+            - containerPort: 9090    # Веб-интерфейс и API Prometheus
+          args:
+            - '--config.file=/etc/prometheus/prometheus.yml'    # Путь к конфигу
+            - '--storage.tsdb.path=/prometheus'                 # Директория данных на PVC
+            - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+            - '--web.console.templates=/usr/share/prometheus/consoles'
+            - '--web.enable-lifecycle'  # Разрешить reload конфига через POST /-/reload
+
+          volumeMounts:
+            - name: prometheus-config
+              mountPath: /etc/prometheus    # ConfigMap монтируется — появится prometheus.yml
+            - name: prometheus-storage
+              mountPath: /prometheus        # PVC для хранения данных TSDB
+
+      volumes:
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config
+        - name: prometheus-storage
+          persistentVolumeClaim:
+            claimName: prometheus-pvc
+
+---
+# --- РЕСУРС 4: Service с NodePort ---
+# NodePort 30900 выбран по паттерну: 9090 → 30900 (добавляем "3" спереди)
+# Доступ: http://localhost:30900
+# Там можно смотреть метрики напрямую, проверять что таргет hospital-app UP.
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus              # DNS-имя — используется в Grafana datasource
+  namespace: pet-hospital
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - port: 9090
+      targetPort: 9090
+      nodePort: 30901           # Внешний порт на хост-машине (30900 занят namespace marketplace)
+  type: NodePort

@@ -12,6 +12,118 @@ docker-compose up -d          # поднять все 8 сервисов
 docker-compose up -d --build app  # пересобрать после изменения кода
 ```
 
+---
+
+## Kubernetes (Rancher Desktop)
+
+Альтернативный способ запуска — через Kubernetes локально в Rancher Desktop.
+
+### Структура K8s манифестов
+
+```
+rancher/k8s/
+├── 00-namespace.yaml   # namespace: pet-hospital
+├── 01-secrets.yaml     # postgres password
+├── 02-postgres.yaml    # PVC 1Gi + Deployment + ClusterIP
+├── 03-redis.yaml       # Deployment + ClusterIP (без PVC — кэш не персистентен)
+├── 04-zookeeper.yaml   # Deployment + ClusterIP
+├── 05-kafka.yaml       # initContainer(wait-zookeeper) + ClusterIP :29092/:9092
+├── 06-kafdrop.yaml     # initContainer(wait-kafka) + NodePort :30009
+├── 07-loki.yaml        # ConfigMap + PVC 2Gi + securityContext(root) + ClusterIP
+├── 08-prometheus.yaml  # ConfigMap + PVC 1Gi + NodePort :30900
+├── 09-grafana.yaml     # 3×ConfigMap + PVC 256Mi + NodePort :30300
+├── 10-app.yaml         # 4×initContainer + imagePullPolicy:Never + NodePort :30090
+└── 11-dashboard.yaml   # K8s Dashboard в namespace kubernetes-dashboard + NodePort :30443
+```
+
+### Порты сервисов (K8s NodePort)
+
+| Сервис | URL | Логин |
+|--------|-----|-------|
+| Приложение | http://localhost:30090 | admin / admin123 |
+| Kafdrop | http://localhost:30009 | — |
+| Prometheus | http://localhost:30901 | — |
+| Grafana | http://localhost:30301 | admin / admin |
+| K8s Dashboard | https://localhost:30443 | Bearer token |
+
+### Имена K8s Services (DNS внутри кластера)
+
+Имена намеренно совпадают с именами сервисов в docker-compose:
+
+| K8s Service | DNS в приложении | Файл |
+|-------------|-----------------|------|
+| `postgres` | `jdbc:postgresql://postgres:5432/hospital_db` | 02-postgres.yaml |
+| `redis` | `SPRING_DATA_REDIS_HOST=redis` | 03-redis.yaml |
+| `kafka` | `SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092` | 05-kafka.yaml |
+| `loki` | `LOKI_URL=http://loki:3100` | 07-loki.yaml |
+| `prometheus` | `http://prometheus:9090` (Grafana datasource) | 08-prometheus.yaml |
+| `hospital-app` | `targets: hospital-app:8090` (Prometheus scrape) | 10-app.yaml |
+
+### Деплой (три шага)
+
+```powershell
+# 1. Собрать образ и загрузить в VM Rancher Desktop
+docker build --provenance=false -t pet-hospital:1.0.0 .
+docker save pet-hospital:1.0.0 -o $env:TEMP\pet-hospital.tar
+rdctl shell -- sh -c "docker load < /mnt/c/Users/$env:USERNAME/AppData/Local/Temp/pet-hospital.tar"
+```
+```powershell
+# 2. Задеплоить весь стек
+kubectl apply -f rancher/k8s/
+```
+```powershell
+# 3. Следить за запуском
+kubectl get pods -n pet-hospital -w
+```
+
+### Критические решения K8s
+
+**`enableServiceLinks: false`** (05-kafka.yaml) — K8s автоматически инжектирует env-переменную `KAFKA_PORT` во все поды namespace (из Service с именем `kafka`). Confluent Kafka интерпретирует любую `KAFKA_*` переменную как конфиг → конфликт → Exit Code 1 через 2 секунды. `enableServiceLinks: false` отключает эту инжекцию.
+
+**imagePullPolicy: Never** — обязательно для локальных образов в Rancher Desktop.
+`docker build` кладёт образ в Docker Desktop VM, а k3s использует отдельную VM.
+Без загрузки через `rdctl shell -- docker load` образ не найдётся.
+`--provenance=false` при build обязателен — без него BuildKit создаёт manifest list,
+который k3s не может использовать с `imagePullPolicy: Never`.
+
+**securityContext.runAsUser: 0** (Loki) — Loki 2.x запускается от UID 10001,
+но PVC создаётся с правами root. Без runAsUser:0 → Permission denied при записи в /loki.
+
+**Kafka ADVERTISED_LISTENERS** — два listener'а обязательны:
+- `PLAINTEXT://kafka:29092` — для подов внутри K8s (K8s DNS-имя)
+- `PLAINTEXT_HOST://localhost:9092` — для port-forward с хоста
+
+**4 initContainer в 10-app.yaml** — Spring Boot падает при старте если БД, Redis,
+Kafka или Loki недоступны. initContainer ждёт каждую зависимость (nc -z host port)
+перед запуском основного контейнера.
+
+**livenessProbe.initialDelaySeconds: 90** — БОЛЬШЕ чем у readinessProbe (30).
+Если liveness сработает раньше чем Spring Boot запустится, K8s убьёт Pod → цикл.
+
+**Grafana: два ConfigMap в одну директорию** — нельзя смонтировать два ConfigMap
+в одну директорию (второй перезатирает первый). Решение:
+- `grafana-dashboard-config` → `/dashboards/` (только dashboards.yml)
+- `grafana-dashboards` → `/dashboards/json/` (JSON файлы)
+- В dashboards.yml: `path: /dashboards/json`
+
+### Обновление приложения
+
+```powershell
+docker build --provenance=false -t pet-hospital:1.0.0 .
+docker save pet-hospital:1.0.0 -o $env:TEMP\pet-hospital.tar
+rdctl shell -- sh -c "docker load < /mnt/c/Users/$env:USERNAME/AppData/Local/Temp/pet-hospital.tar"
+kubectl rollout restart deployment/hospital-app -n pet-hospital
+```
+
+### Сброс стека
+
+```powershell
+kubectl delete namespace pet-hospital   # Удаляет все ресурсы включая PVC (данные потеряются)
+kubectl apply -f rancher/k8s/           # Поднять заново
+```
+
+---
+
 | Интерфейс | URL | Логин / Пароль |
 |---|---|---|
 | Администрация (HIS) | http://localhost:8090/admin.html | admin / admin123 |

@@ -38,6 +38,7 @@
 29. [Чат-система](#29-чат-система)
 30. [Медицинская документация](#30-медицинская-документация)
 31. [Портал врача](#31-портал-врача)
+32. [Kubernetes: запуск в Rancher Desktop](#32-kubernetes-запуск-в-rancher-desktop)
 
 ---
 
@@ -2850,3 +2851,153 @@ jdbc.update("UPDATE doctor SET user_id = (SELECT id FROM users WHERE username = 
 ```
 
 V7-миграция дублирует эту логику как fallback, но является no-op при первом запуске (таблица `users` пуста в момент Flyway-миграций).
+
+---
+
+## 32. Kubernetes: запуск в Rancher Desktop
+
+Kubernetes-деплой позволяет запустить весь стек (9 сервисов) в локальном k3s-кластере.
+Манифесты находятся в `rancher/k8s/` — каждый файл содержит подробные построчные комментарии.
+
+### Предварительные требования
+
+1. Установить [Rancher Desktop](https://rancherdesktop.io)
+2. При установке выбрать Container Runtime: **dockerd (Moby)**
+3. Дождаться полной инициализации (иконка в трее перестаёт крутиться)
+
+### Структура K8s манифестов
+
+```
+rancher/k8s/
+├── 00-namespace.yaml   # namespace: pet-hospital
+├── 01-secrets.yaml     # postgres password (Secret)
+├── 02-postgres.yaml    # PVC 1Gi + Deployment + ClusterIP Service
+├── 03-redis.yaml       # Deployment + ClusterIP (без PVC: кэш не персистентен)
+├── 04-zookeeper.yaml   # Deployment + ClusterIP
+├── 05-kafka.yaml       # initContainer(wait-zookeeper) + ClusterIP :29092
+├── 06-kafdrop.yaml     # initContainer(wait-kafka) + NodePort :30009
+├── 07-loki.yaml        # ConfigMap + PVC 2Gi + runAsUser:0 + ClusterIP
+├── 08-prometheus.yaml  # ConfigMap + PVC 1Gi + NodePort :30900
+├── 09-grafana.yaml     # 3×ConfigMap + PVC 256Mi + NodePort :30300
+├── 10-app.yaml         # 4×initContainer + imagePullPolicy:Never + NodePort :30090
+└── 11-dashboard.yaml   # K8s Dashboard (namespace kubernetes-dashboard) + NodePort :30443
+```
+
+### Шаг 1: Сборка и загрузка образа
+
+> **Почему нельзя просто `docker build`?**
+> Rancher Desktop запускает k3s в отдельной Linux VM через WSL2. `docker build` кладёт
+> образ в хранилище Docker Desktop, а k3s имеет своё отдельное хранилище. Образ нужно
+> загрузить именно в VM через `rdctl shell`.
+
+```powershell
+# Флаг --provenance=false обязателен!
+# Без него BuildKit создаёт manifest list → k3s не найдёт образ с imagePullPolicy: Never
+docker build --provenance=false -t pet-hospital:1.0.0 .
+```
+
+```powershell
+docker save pet-hospital:1.0.0 -o $env:TEMP\pet-hospital.tar
+```
+
+```powershell
+# /mnt/c/ = диск C:\ видимый из Linux VM
+rdctl shell -- sh -c "docker load < /mnt/c/Users/$env:USERNAME/AppData/Local/Temp/pet-hospital.tar"
+```
+
+```powershell
+# Проверить
+rdctl shell -- sh -c "docker images pet-hospital"
+```
+
+### Шаг 2: Деплой
+
+```powershell
+kubectl apply -f rancher/k8s/
+```
+
+### Шаг 3: Проверка запуска
+
+```powershell
+kubectl get pods -n pet-hospital -w
+```
+
+Нормальная последовательность статусов `hospital-app`:
+```
+Init:0/4  →  Init:1/4  →  Init:2/4  →  Init:3/4  →  Running (0/1)  →  Running (1/1)
+```
+Полный запуск занимает **3–5 минут**.
+
+### Порты после запуска
+
+| Сервис | URL | Логин |
+|--------|-----|-------|
+| Приложение | http://localhost:30090/admin.html | admin / admin123 |
+| Kafdrop | http://localhost:30009 | — |
+| Prometheus | http://localhost:30900 | — |
+| Grafana | http://localhost:30300 | admin / admin |
+| K8s Dashboard | https://localhost:30443 | Bearer token |
+
+### Токен для Kubernetes Dashboard
+
+```powershell
+$b64 = kubectl -n kubernetes-dashboard get secret admin-user-token -o jsonpath='{.data.token}'
+[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($b64))
+```
+
+Вставить полученную строку (`eyJ...`) в форму входа Dashboard.
+Открыть: https://localhost:30443 → игнорировать предупреждение о сертификате → Token.
+
+### Ключевые команды отладки
+
+```powershell
+# Логи приложения
+kubectl logs -n pet-hospital deployment/hospital-app -f
+
+# Полная информация о поде (Events, probe failures)
+kubectl describe pod -n pet-hospital <POD_NAME>
+
+# Войти внутрь контейнера
+kubectl exec -it -n pet-hospital deployment/hospital-app -- /bin/sh
+
+# Port-forward к PostgreSQL для DBeaver/pgAdmin
+kubectl port-forward -n pet-hospital service/postgres 5432:5432
+```
+
+### Обновление приложения
+
+```powershell
+docker build --provenance=false -t pet-hospital:1.0.0 .
+docker save pet-hospital:1.0.0 -o $env:TEMP\pet-hospital.tar
+rdctl shell -- sh -c "docker load < /mnt/c/Users/$env:USERNAME/AppData/Local/Temp/pet-hospital.tar"
+kubectl rollout restart deployment/hospital-app -n pet-hospital
+```
+
+### Полный сброс
+
+```powershell
+kubectl delete namespace pet-hospital   # удаляет все ресурсы + данные PVC
+kubectl apply -f rancher/k8s/           # поднять заново
+```
+
+### Критические решения K8s в этом проекте
+
+**`imagePullPolicy: Never`** (10-app.yaml) — образ `pet-hospital:1.0.0` должен быть
+загружен в VM до деплоя. K8s не ищет его в реестре.
+
+**`securityContext.runAsUser: 0`** (07-loki.yaml) — Loki 2.x запускается от UID 10001,
+но PVC создан с правами root → Permission denied. Запуск от root решает проблему.
+
+**4 initContainers** (10-app.yaml) — Spring Boot с Flyway не запустится без PostgreSQL,
+Redis, Kafka и Loki. initContainer блокирует старт основного контейнера пока зависимость недоступна.
+
+**`livenessProbe.initialDelaySeconds: 90`** — больше чем у readinessProbe (30).
+Если liveness сработает до того как Spring Boot успел запуститься, K8s убьёт Pod → CrashLoopBackOff.
+
+**3 ConfigMap для Grafana** — K8s нельзя смонтировать два ConfigMap в одну директорию.
+`grafana-dashboard-config` → `/dashboards/` (dashboards.yml), `grafana-dashboards` → `/dashboards/json/` (JSON файлы).
+В dashboards.yml прописан `path: /dashboards/json`.
+
+**Kafka dual listeners** (05-kafka.yaml):
+- `PLAINTEXT://kafka:29092` — для подов K8s (K8s DNS-имя)
+- `PLAINTEXT_HOST://localhost:9092` — для port-forward с хоста

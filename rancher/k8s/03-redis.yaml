@@ -1,0 +1,53 @@
+# =============================================================
+# 03-redis.yaml — Redis: кэш сессий и данных приложения
+# =============================================================
+# Redis используется как кэш (spring.cache.type=redis, TTL=5мин).
+# Для кэша PVC не нужен — при перезапуске пода кэш обнуляется,
+# приложение наполнит его заново из PostgreSQL. Это нормально.
+# =============================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: pet-hospital
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine        # Официальный образ Redis 7, минимальный размер
+          ports:
+            - containerPort: 6379      # Стандартный порт Redis
+
+          # readinessProbe: Redis готов когда отвечает на PING командой PONG
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping                 # Встроенная команда Redis — проверка живости
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+# Service: приложение подключается через SPRING_DATA_REDIS_HOST=redis
+# "redis" здесь — DNS-имя Service внутри namespace
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis                # DNS-имя — совпадает с docker-compose service name
+  namespace: pet-hospital
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+  type: ClusterIP            # Только внутри кластера

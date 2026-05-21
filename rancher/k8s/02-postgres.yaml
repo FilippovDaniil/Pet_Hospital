@@ -1,0 +1,100 @@
+# =============================================================
+# 02-postgres.yaml — PostgreSQL: хранилище + деплоймент + сервис
+# =============================================================
+# Содержит три ресурса, разделённых --- (YAML multi-document):
+#   1. PersistentVolumeClaim — запрос на дисковое пространство
+#   2. Deployment            — описание пода с контейнером
+#   3. Service               — сетевой доступ к поду внутри кластера
+# =============================================================
+
+# --- РЕСУРС 1: PersistentVolumeClaim (PVC) ---
+# PVC — это "запрос на хранилище". K8s автоматически выделяет
+# PersistentVolume (реальный диск) под этот запрос.
+# В Rancher Desktop используется встроенный провайдер local-path.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc       # Имя PVC — на него ссылается Deployment ниже
+  namespace: pet-hospital
+spec:
+  accessModes:
+    - ReadWriteOnce        # RWO = один под может читать и писать одновременно
+                           # (подходит для stateful приложений типа PostgreSQL)
+  resources:
+    requests:
+      storage: 1Gi         # 1 гигабайт — достаточно для учебного проекта
+
+---
+# --- РЕСУРС 2: Deployment ---
+# Deployment управляет жизненным циклом подов: создаёт, перезапускает,
+# обновляет. Описывает ЖЕЛАЕМОЕ состояние, K8s сам приводит к нему.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres            # Имя деплоймента (для kubectl get deployments)
+  namespace: pet-hospital
+spec:
+  replicas: 1               # Одна реплика — для учебного проекта достаточно
+  selector:
+    matchLabels:
+      app: postgres         # Деплоймент управляет подами с меткой app=postgres
+  template:                 # Шаблон пода — из него создаются экземпляры
+    metadata:
+      labels:
+        app: postgres       # Метка пода — по ней Service находит нужные поды
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine  # Лёгкий образ на базе Alpine Linux
+          ports:
+            - containerPort: 5432    # PostgreSQL слушает порт 5432 внутри контейнера
+          env:
+            - name: POSTGRES_USER
+              value: "postgres"      # Имя пользователя БД
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pet-hospital-secrets  # Берём пароль из Secret (не хардкодим!)
+                  key: postgres-password
+            - name: POSTGRES_DB
+              value: "hospital_db"   # Имя базы данных, создаётся автоматически
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data  # Стандартный путь данных PostgreSQL
+
+          # readinessProbe: когда Pod ГОТОВ принимать подключения?
+          # Пока probe не пройдёт — Service не направляет трафик на этот под.
+          # initContainer в 10-app.yaml тоже ждёт этого порта.
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready    # Встроенная утилита PostgreSQL — проверяет готовность
+                - -U
+                - postgres
+            initialDelaySeconds: 10  # Дать контейнеру время запуститься
+            periodSeconds: 5         # Проверять каждые 5 секунд
+
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc  # Подключаем PVC, объявленный выше
+
+---
+# --- РЕСУРС 3: Service ---
+# Service — стабильный DNS-адрес для набора подов.
+# Поды могут пересоздаваться с новыми IP, но Service остаётся неизменным.
+# ClusterIP: доступен ТОЛЬКО внутри кластера (другие поды могут коннектиться).
+# Приложение подключается к БД через: jdbc:postgresql://postgres:5432/hospital_db
+# "postgres" здесь — это имя Service, K8s DNS резолвит его автоматически.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres            # ← Это DNS-имя! Именно по нему подключается приложение
+  namespace: pet-hospital
+spec:
+  selector:
+    app: postgres           # Направлять трафик на поды с меткой app=postgres
+  ports:
+    - port: 5432            # Порт, на котором Service принимает подключения
+      targetPort: 5432      # Порт внутри контейнера (куда перенаправить)
+  type: ClusterIP           # Только внутри кластера (PostgreSQL снаружи не нужен)
