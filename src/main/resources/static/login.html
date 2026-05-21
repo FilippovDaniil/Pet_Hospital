@@ -176,8 +176,8 @@
   }
 
   // Redirect if already logged in
-  if (localStorage.getItem('token')) {
-    window.location.href = roleToPath(localStorage.getItem('role'));
+  if (sessionStorage.getItem('token')) {
+    window.location.href = roleToPath(sessionStorage.getItem('role'));
   }
 
   document.addEventListener('keydown', e => {
@@ -213,10 +213,10 @@
         return;
       }
 
-      localStorage.setItem('token',    data.token);
-      localStorage.setItem('username', data.username);
-      localStorage.setItem('fullName', data.fullName || data.username);
-      localStorage.setItem('role',     data.role);
+      sessionStorage.setItem('token',    data.token);
+      sessionStorage.setItem('username', data.username);
+      sessionStorage.setItem('fullName', data.fullName || data.username);
+      sessionStorage.setItem('role',     data.role);
       window.location.href = roleToPath(data.role);
     } catch (e) {
       showError('Ошибка соединения с сервером');

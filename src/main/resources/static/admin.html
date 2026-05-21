@@ -57,17 +57,20 @@
     <div class="sidebar-footer">Pet Hospital HIS v1.0</div>
   </aside>
 
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
   <!-- ========== MAIN CONTENT ========== -->
   <main class="main-content">
 
     <!-- Top bar -->
     <div class="topbar">
+      <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Меню">☰</button>
       <span class="topbar-title" id="topbarTitle">Дашборд</span>
       <div class="topbar-right">
         <span id="role-badge" class="badge" style="background:#e0f2fe;color:#0369a1;font-size:.75rem"></span>
         <span id="user-name" style="font-size:.88rem;color:#475569;font-weight:500"></span>
         <a href="/api-docs" target="_blank" class="btn btn-outline btn-sm">API Docs</a>
-        <button class="btn btn-outline btn-sm" onclick="logout()">
+        <button class="btn btn-outline btn-sm btn-logout-keep" onclick="logout()">
           <i class="fa fa-right-from-bracket"></i> Выход
         </button>
       </div>
@@ -251,7 +254,7 @@
 
       <!-- ======== ADMIN ======== -->
       <div id="page-admin" class="section-page">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div class="admin-two-col" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
           <div class="card">
             <div class="card-header">
               <i class="fa fa-bed"></i> Занятость палат
@@ -288,7 +291,7 @@
 
       <!-- ======== CHATS ======== -->
       <div id="page-chats" class="section-page">
-        <div style="display:grid;grid-template-columns:300px 1fr;gap:16px;height:640px">
+        <div class="chat-admin-grid" style="display:grid;grid-template-columns:300px 1fr;gap:16px;height:640px">
 
           <!-- Room list -->
           <div class="card" style="padding:0;display:flex;flex-direction:column;overflow:hidden">
@@ -715,8 +718,8 @@
 <!-- Role guard: ROLE_ADMIN only -->
 <script>
   (function() {
-    const _t = localStorage.getItem('token');
-    const _r = localStorage.getItem('role');
+    const _t = sessionStorage.getItem('token');
+    const _r = sessionStorage.getItem('role');
     if (!_t || _r !== 'ROLE_ADMIN') {
       window.location.href = '/login.html';
     }

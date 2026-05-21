@@ -214,10 +214,35 @@ textarea.form-control{resize:vertical;min-height:80px}
 .badge-CONFIRMED{background:var(--green-light);color:#065f46}
 .badge-CANCELLED{background:var(--red-light);color:#991b1b}
 
+/* ── Hamburger button ── */
+.hamburger-btn{display:none;align-items:center;justify-content:center;width:34px;height:34px;border-radius:7px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);color:#fff;cursor:pointer;font-size:1.2rem;flex-shrink:0;margin-right:4px}
+
+/* ── Sidebar overlay ── */
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:49}
+.sidebar-overlay.visible{display:block}
+
 /* ── Responsive ── */
 @media(max-width:900px){
   .stats-row{grid-template-columns:repeat(2,1fr)}
   .detail-panel{width:100%}
+  .dashboard-two-col{grid-template-columns:1fr !important}
+}
+@media(max-width:768px){
+  .sidebar{position:fixed;height:100vh;transform:translateX(-100%);transition:transform .25s;z-index:50}
+  .sidebar.mobile-open{transform:translateX(0)}
+  .app{overflow:visible;height:auto}
+  .main{min-height:100vh;overflow-y:auto}
+  .hamburger-btn{display:flex}
+  .topbar{padding:0 14px}
+  .content{padding:16px}
+  .chat-layout{grid-template-columns:1fr;height:auto}
+  .chat-rooms-col{height:220px;border-right:none;border-bottom:1px solid var(--border)}
+  .chat-layout{height:auto}
+}
+@media(max-width:480px){
+  .stats-row{grid-template-columns:1fr 1fr}
+  .topbar-title{font-size:.92rem}
+  .btn-refresh{display:none}
 }
 </style>
 </head>
@@ -264,9 +289,12 @@ textarea.form-control{resize:vertical;min-height:80px}
     </div>
   </aside>
 
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
   <!-- ════ MAIN ════ -->
   <div class="main">
     <div class="topbar">
+      <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Меню">☰</button>
       <div class="topbar-title" id="topbar-title">Дашборд</div>
       <button class="btn-refresh" onclick="reloadPage()">↻ Обновить</button>
     </div>
@@ -280,7 +308,7 @@ textarea.form-control{resize:vertical;min-height:80px}
           <div class="stat-card"><div class="stat-icon">📄</div><div class="stat-num" id="ds-docs">—</div><div class="stat-label">Документов выдано</div></div>
           <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-num" id="ds-notes">—</div><div class="stat-label">Заметок добавлено</div></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="dashboard-two-col" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
           <div class="card">
             <div class="card-header">
               <span class="card-title">Последние пациенты</span>
@@ -419,7 +447,7 @@ textarea.form-control{resize:vertical;min-height:80px}
 
 <script>
 const API = 'http://localhost:8090';
-let token = localStorage.getItem('token');
+let token = sessionStorage.getItem('token');
 let myUser = null;
 let myDoctor = null;
 let currentPage = 'dashboard';
@@ -429,7 +457,7 @@ let activePanelTab = 'history';
 let chatRoomId = null, chatLastId = 0, chatTimer = null;
 
 // ── Guard: ROLE_DOCTOR only ──
-const _role = localStorage.getItem('role');
+const _role = sessionStorage.getItem('role');
 if (!token || _role !== 'ROLE_DOCTOR') { window.location.href = '/login.html'; }
 
 window.addEventListener('DOMContentLoaded', init);
@@ -817,7 +845,7 @@ async function loadPanelChat(body) {
 }
 
 function panelMsgBubble(m) {
-  const myName = localStorage.getItem('fullName') || '';
+  const myName = sessionStorage.getItem('fullName') || '';
   const mine = m.senderName === myName;
   const time = m.sentAt ? new Date(m.sentAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}) : '';
   return `<div class="bubble ${mine?'mine':'other'}">
@@ -960,7 +988,7 @@ async function openChatRoom(roomId, patientName) {
 }
 
 function chatBubble(m) {
-  const myName = localStorage.getItem('fullName') || '';
+  const myName = sessionStorage.getItem('fullName') || '';
   const mine = m.senderName === myName;
   const time = m.sentAt ? new Date(m.sentAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}) : '';
   return `<div class="bubble ${mine?'mine':'other'}">
@@ -1024,10 +1052,20 @@ function stopChatPoll() {
   if (chatTimer) { clearInterval(chatTimer); chatTimer = null; }
 }
 
+// ── Mobile sidebar ──
+function toggleSidebar() {
+  document.querySelector('.sidebar')?.classList.toggle('mobile-open');
+  document.getElementById('sidebarOverlay')?.classList.toggle('visible');
+}
+function closeSidebar() {
+  document.querySelector('.sidebar')?.classList.remove('mobile-open');
+  document.getElementById('sidebarOverlay')?.classList.remove('visible');
+}
+
 // ── Auth ──
 function logout() {
   stopChatPoll();
-  localStorage.clear();
+  sessionStorage.clear();
   window.location.href = '/login.html';
 }
 

@@ -51,14 +51,14 @@ function toast(msg, type = 'success') {
 }
 
 async function api(path, options = {}) {
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   try {
     const res = await fetch(API + path, { headers, ...options });
     if (res.status === 401) {
-      localStorage.clear();
+      sessionStorage.clear();
       window.location.href = '/login.html';
       throw new Error('Unauthorized');
     }
@@ -78,7 +78,7 @@ async function api(path, options = {}) {
 
 function logout() {
   stopChatPoll();
-  localStorage.clear();
+  sessionStorage.clear();
   window.location.href = '/login.html';
 }
 
@@ -799,7 +799,7 @@ async function openChat(roomId, label) {
 
 function renderChatMessages(msgs, replace) {
   const area = $('chat-messages-area');
-  const myName = localStorage.getItem('fullName') || '';
+  const myName = sessionStorage.getItem('fullName') || '';
 
   if (replace) {
     if (msgs.length === 0) {
@@ -998,18 +998,32 @@ async function savePatientDoc() {
 }
 
 // =============================================
+// Mobile sidebar toggle
+// =============================================
+
+function toggleSidebar() {
+  document.querySelector('.sidebar')?.classList.toggle('mobile-open');
+  document.getElementById('sidebarOverlay')?.classList.toggle('visible');
+}
+
+function closeSidebar() {
+  document.querySelector('.sidebar')?.classList.remove('mobile-open');
+  document.getElementById('sidebarOverlay')?.classList.remove('visible');
+}
+
+// =============================================
 // Init
 // =============================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
   if (!token) {
     window.location.href = '/login.html';
     return;
   }
 
-  const fullName = localStorage.getItem('fullName') || localStorage.getItem('username') || '';
-  currentRole = localStorage.getItem('role') || '';
+  const fullName = sessionStorage.getItem('fullName') || sessionStorage.getItem('username') || '';
+  currentRole = sessionStorage.getItem('role') || '';
   if ($('user-name'))  $('user-name').textContent  = fullName;
   if ($('role-badge')) $('role-badge').textContent = roleLabel(currentRole);
 

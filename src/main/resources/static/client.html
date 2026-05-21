@@ -235,14 +235,35 @@ select.form-control { cursor:pointer; }
 @media (max-width:900px) {
   .summary-grid { grid-template-columns:repeat(2,1fr); }
   .account-tabs-bar { overflow-x:auto; }
+  .steps { grid-template-columns:repeat(2,1fr); }
 }
 @media (max-width:768px) {
+  .hero { padding:48px 20px 64px; }
   .hero h1 { font-size:1.875rem; }
+  .hero p { font-size:1rem; }
   .stats-inner { grid-template-columns:repeat(2,1fr); }
   .steps { grid-template-columns:1fr; }
   .footer-inner { grid-template-columns:1fr; gap:24px; }
+  .nav-inner { padding:0 16px; gap:16px; }
   .nav-links { display:none; }
   .summary-grid { grid-template-columns:1fr 1fr; }
+  .account-header { flex-direction:column; align-items:flex-start; }
+  .section { padding:40px 20px; }
+  .chat-messages { height:260px; }
+  .doctors-grid { grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); }
+}
+@media (max-width:480px) {
+  .hero h1 { font-size:1.4rem; }
+  .hero p { font-size:.9rem; }
+  .hero-btns { flex-direction:column; align-items:center; }
+  .btn-hero-primary, .btn-hero-secondary { width:100%; max-width:280px; }
+  .summary-grid { grid-template-columns:1fr; }
+  .nav-auth .btn-ghost { display:none; }
+  .section { padding:32px 16px; }
+  .section-header h2 { font-size:1.5rem; }
+  .stats-inner { grid-template-columns:1fr 1fr; }
+  .doctor-card { padding:18px; }
+  .chat-messages { height:220px; }
 }
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -478,8 +499,8 @@ select.form-control { cursor:pointer; }
 
 <script>
 const API = 'http://localhost:8090';
-let token = localStorage.getItem('clientToken');
-let currentUser = JSON.parse(localStorage.getItem('clientUser') || 'null');
+let token = sessionStorage.getItem('clientToken');
+let currentUser = JSON.parse(sessionStorage.getItem('clientUser') || 'null');
 let allDoctors = [];
 let allServices = [];
 
@@ -694,8 +715,8 @@ async function doRegister(e) {
 function onLoginSuccess(data) {
   token = data.token;
   currentUser = { username: data.username, fullName: data.fullName, role: data.role };
-  localStorage.setItem('clientToken', token);
-  localStorage.setItem('clientUser', JSON.stringify(currentUser));
+  sessionStorage.setItem('clientToken', token);
+  sessionStorage.setItem('clientUser', JSON.stringify(currentUser));
   updateAuthUI();
 }
 
@@ -709,8 +730,8 @@ function updateAuthUI() {
 
 function logout() {
   token = null; currentUser = null;
-  localStorage.removeItem('clientToken');
-  localStorage.removeItem('clientUser');
+  sessionStorage.removeItem('clientToken');
+  sessionStorage.removeItem('clientUser');
   document.getElementById('auth-buttons').style.display = 'flex';
   document.getElementById('user-panel').style.display = 'none';
   toast('Вы вышли из системы', 'info');

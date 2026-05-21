@@ -62,15 +62,18 @@
     <div class="sidebar-footer">Pet Hospital HIS v1.0</div>
   </aside>
 
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
   <!-- ========== MAIN CONTENT ========== -->
   <main class="main-content">
 
     <div class="topbar">
+      <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Меню">☰</button>
       <span class="topbar-title" id="topbarTitle">Дашборд</span>
       <div class="topbar-right">
         <span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:.75rem">Медсестра</span>
         <span id="user-name" style="font-size:.88rem;color:#475569;font-weight:500"></span>
-        <button class="btn btn-outline btn-sm" onclick="logout()">
+        <button class="btn btn-outline btn-sm btn-logout-keep" onclick="logout()">
           <i class="fa fa-right-from-bracket"></i> Выход
         </button>
       </div>
@@ -397,8 +400,8 @@
 
 // ── Role guard ──
 (function() {
-  const t = localStorage.getItem('token');
-  const r = localStorage.getItem('role');
+  const t = sessionStorage.getItem('token');
+  const r = sessionStorage.getItem('role');
   if (!t || r !== 'ROLE_NURSE') window.location.href = '/login.html';
 })();
 
@@ -407,7 +410,7 @@ let currentSection = 'dashboard';
 let patientsPage = 0;
 
 document.addEventListener('DOMContentLoaded', () => {
-  const name = localStorage.getItem('fullName') || localStorage.getItem('username') || '';
+  const name = sessionStorage.getItem('fullName') || sessionStorage.getItem('username') || '';
   document.getElementById('user-name').textContent = name;
   navigate('dashboard');
 });
@@ -439,7 +442,16 @@ document.addEventListener('click', e => {
   if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
 });
 
-function logout() { localStorage.clear(); window.location.href = '/login.html'; }
+function logout() { sessionStorage.clear(); window.location.href = '/login.html'; }
+
+function toggleSidebar() {
+  document.querySelector('.sidebar')?.classList.toggle('mobile-open');
+  document.getElementById('sidebarOverlay')?.classList.toggle('visible');
+}
+function closeSidebar() {
+  document.querySelector('.sidebar')?.classList.remove('mobile-open');
+  document.getElementById('sidebarOverlay')?.classList.remove('visible');
+}
 
 function toast(msg, type = 'success') {
   const el = document.createElement('div');
@@ -451,12 +463,12 @@ function toast(msg, type = 'success') {
 }
 
 async function apiFetch(path, options = {}) {
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   try {
     const res = await fetch(API + path, { headers, ...options });
-    if (res.status === 401) { localStorage.clear(); window.location.href = '/login.html'; throw new Error('Unauthorized'); }
+    if (res.status === 401) { sessionStorage.clear(); window.location.href = '/login.html'; throw new Error('Unauthorized'); }
     if (res.status === 204) return null;
     const data = await res.json();
     if (!res.ok) { const msg = data.message || 'Server error'; toast(msg, 'error'); throw new Error(msg); }
