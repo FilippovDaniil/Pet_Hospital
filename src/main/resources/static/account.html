@@ -523,11 +523,11 @@ function reloadCurrentPage() { navigate(currentPage); }
 async function loadOverview() {
   try {
     const [appts, orders, docs, hist, assigns] = await Promise.all([
-      api('/api/client/appointments/my'),
-      api('/api/client/service-orders/my'),
-      api('/api/medical/documents/my').catch(() => []),
-      api('/api/medical/history/my').catch(() => ({notes:[],documents:[]})),
-      api('/api/client/my-assignments').catch(() => []),
+      api('/api/client/me/appointments'),
+      api('/api/client/me/service-orders'),
+      api('/api/medical/me/documents').catch(() => []),
+      api('/api/medical/me/history').catch(() => ({notes:[],documents:[]})),
+      api('/api/client/me/assignments').catch(() => []),
     ]);
     document.getElementById('ov-appts').textContent  = appts.length;
     document.getElementById('ov-orders').textContent = orders.length;
@@ -545,7 +545,7 @@ async function loadAppointments() {
   const el = document.getElementById('appts-list');
   el.innerHTML = '<div class="empty-state"><span class="spinner"></span> Загрузка…</div>';
   try {
-    const appts = await api('/api/client/appointments/my');
+    const appts = await api('/api/client/me/appointments');
     if (!appts.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">🗓</div>Нет записей. <a href="/client.html" style="color:var(--blue)">Записаться к врачу →</a></div>'; return; }
     el.innerHTML = appts.map(a => apptCard(a)).join('');
   } catch(e) { el.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; }
@@ -582,7 +582,7 @@ async function loadOrders() {
   const el = document.getElementById('orders-list');
   el.innerHTML = '<div class="empty-state"><span class="spinner"></span> Загрузка…</div>';
   try {
-    const orders = await api('/api/client/service-orders/my');
+    const orders = await api('/api/client/me/service-orders');
     if (!orders.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">🔬</div>Нет заказов. <a href="/client.html#services" style="color:var(--blue)">Выбрать услугу →</a></div>'; return; }
     el.innerHTML = orders.map(o => orderCard(o)).join('');
   } catch(e) { el.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; }
@@ -618,7 +618,7 @@ async function loadAssignments() {
   const el = document.getElementById('assignments-list');
   el.innerHTML = '<div class="empty-state"><span class="spinner"></span> Загрузка…</div>';
   try {
-    const data = await api('/api/client/my-assignments');
+    const data = await api('/api/client/me/assignments');
     if (!data.length) {
       el.innerHTML = '<div class="empty-state"><div class="empty-icon">💉</div>Назначений нет</div>';
       return;
@@ -647,7 +647,7 @@ async function loadDocuments() {
   const el = document.getElementById('docs-list');
   el.innerHTML = '<div class="empty-state"><span class="spinner"></span> Загрузка…</div>';
   try {
-    const docs = await api('/api/medical/documents/my');
+    const docs = await api('/api/medical/me/documents');
     if (!docs.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📄</div>Документов нет. Они появятся после визита к врачу.</div>'; return; }
     el.innerHTML = docs.map(d => docCard(d)).join('');
   } catch(e) { el.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; }
@@ -691,7 +691,7 @@ async function loadHistory() {
   const el = document.getElementById('history-list');
   el.innerHTML = '<div class="empty-state"><span class="spinner"></span> Загрузка…</div>';
   try {
-    const hist = await api('/api/medical/history/my');
+    const hist = await api('/api/medical/me/history');
     const notes = hist?.notes || [];
     if (!notes.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>История пуста. Записи появятся после визита к врачу.</div>'; return; }
     el.innerHTML = notes.map(n => `
@@ -727,7 +727,7 @@ async function loadSupportChat() {
 async function loadDoctorChats() {
   const listEl = document.getElementById('doctor-rooms-list');
   try {
-    const rooms = await api('/api/chat/my-rooms');
+    const rooms = await api('/api/chat/me/rooms');
     const drRooms = (rooms||[]).filter(r => r.type === 'DOCTOR_CLIENT');
     if (!drRooms.length) {
       listEl.innerHTML = '<div style="padding:16px;font-size:.8rem;color:var(--muted)">Нет чатов с врачом</div>';
@@ -825,7 +825,7 @@ function startSupportPoll() {
   supportTimer = setInterval(async () => {
     if (!supportRoomId) return;
     try {
-      const msgs = await api(`/api/chat/rooms/${supportRoomId}/messages/poll?sinceId=${supportLastId}`);
+      const msgs = await api(`/api/chat/rooms/${supportRoomId}/messages?sinceId=${supportLastId}`);
       if (msgs?.length) { msgs.forEach(m => appendMsg(m,'support')); supportLastId = msgs[msgs.length-1].id; }
     } catch(_) {}
   }, 3000);
@@ -837,7 +837,7 @@ function startDoctorPoll() {
   doctorTimer = setInterval(async () => {
     if (!doctorRoomId) return;
     try {
-      const msgs = await api(`/api/chat/rooms/${doctorRoomId}/messages/poll?sinceId=${doctorLastId}`);
+      const msgs = await api(`/api/chat/rooms/${doctorRoomId}/messages?sinceId=${doctorLastId}`);
       if (msgs?.length) { msgs.forEach(m => appendMsg(m,'doctor')); doctorLastId = msgs[msgs.length-1].id; }
     } catch(_) {}
   }, 3000);

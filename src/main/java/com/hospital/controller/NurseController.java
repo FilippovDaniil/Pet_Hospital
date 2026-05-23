@@ -3,6 +3,7 @@ package com.hospital.controller;
 import com.hospital.dto.request.AdjustSupplyRequest;
 import com.hospital.dto.request.CreateAssignmentRequest;
 import com.hospital.dto.request.CreateSupplyRequest;
+import com.hospital.dto.request.UpdateAssignmentStatusRequest;
 import com.hospital.dto.response.MedicalSupplyResponse;
 import com.hospital.dto.response.NurseAssignmentResponse;
 import com.hospital.service.NurseService;
@@ -77,7 +78,7 @@ public class NurseController {
      * delta > 0 — пополнение, delta < 0 — расход.
      * Возвращает HTTP 400 (BusinessRuleException), если новый остаток < 0.
      */
-    @PatchMapping("/supplies/{id}/adjust")
+    @PatchMapping("/supplies/{id}")
     @Operation(summary = "Изменить остаток (delta: +пополнение / -расход)")
     public ResponseEntity<MedicalSupplyResponse> adjustSupply(
             @PathVariable Long id,
@@ -132,12 +133,12 @@ public class NurseController {
      * Обновляет статус назначения: ACTIVE → DONE | CANCELLED.
      * status передаётся как query-параметр (не в теле), т.к. это минимальное изменение.
      */
-    @PatchMapping("/assignments/{id}/status")
+    @PatchMapping("/assignments/{id}")
     @Operation(summary = "Обновить статус назначения (ACTIVE|DONE|CANCELLED)")
     public ResponseEntity<NurseAssignmentResponse> updateStatus(
             @PathVariable Long id,
-            @RequestParam String status) {
-        return ResponseEntity.ok(nurseService.updateAssignmentStatus(id, status));
+            @RequestBody UpdateAssignmentStatusRequest request) {
+        return ResponseEntity.ok(nurseService.updateAssignmentStatus(id, request.getStatus()));
     }
 
     /**

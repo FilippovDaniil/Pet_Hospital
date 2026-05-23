@@ -67,7 +67,7 @@ public class WardController {
      * Сервис проверяет: палата не переполнена, пациент ещё не в другой палате.
      * После успешной госпитализации возвращает обновлённую палату (с увеличенным счётчиком).
      */
-    @PostMapping("/{wardId}/admit/{patientId}")
+    @PutMapping("/{wardId}/patients/{patientId}")
     @Operation(summary = "Admit patient to ward")
     public ResponseEntity<WardResponse> admitPatient(
             @PathVariable Long wardId,
@@ -80,7 +80,7 @@ public class WardController {
      * НЕ меняет статус пациента — только убирает его из палаты.
      * Для полной выписки из больницы — используйте AdminController.dischargePatient().
      */
-    @PostMapping("/{wardId}/discharge/{patientId}")
+    @DeleteMapping("/{wardId}/patients/{patientId}")
     @Operation(summary = "Discharge patient from ward")
     public ResponseEntity<WardResponse> dischargePatient(
             @PathVariable Long wardId,

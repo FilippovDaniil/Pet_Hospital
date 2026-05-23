@@ -160,7 +160,7 @@ class PatientIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
 
-        mockMvc.perform(get("/api/patients/search?q=Поиск Тестовый"))
+        mockMvc.perform(get("/api/patients?q=Поиск Тестовый"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray())
                 .andExpect(jsonPath("$.content[0].fullName").value("Поиск Тестовый Пациент"));
@@ -168,7 +168,7 @@ class PatientIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void searchPatients_byStatus_returnsOnlyMatchingStatus() throws Exception {
-        mockMvc.perform(get("/api/patients/search?status=TREATMENT"))
+        mockMvc.perform(get("/api/patients?status=TREATMENT"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray());
     }
@@ -243,7 +243,7 @@ class PatientIntegrationTest extends AbstractIntegrationTest {
                 .get("id").asLong();
 
         // Назначаем врача
-        mockMvc.perform(put("/api/patients/{id}/assign-doctor/{doctorId}", patientId, doctorId))
+        mockMvc.perform(put("/api/patients/{id}/doctor/{doctorId}", patientId, doctorId))
                 .andExpect(status().isOk());
 
         // Убеждаемся, что чат-комната DOCTOR_CLIENT создана

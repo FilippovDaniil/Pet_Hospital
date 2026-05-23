@@ -655,7 +655,7 @@ async function doAdjust() {
   const delta = parseInt(document.getElementById('adjust-delta').value) || 0;
   if (delta === 0) { toast('Укажите ненулевое изменение', 'warning'); return; }
   try {
-    await apiFetch(`/api/nurse/supplies/${id}/adjust`, { method:'PATCH', body: JSON.stringify({ delta }) });
+    await apiFetch(`/api/nurse/supplies/${id}`, { method:'PATCH', body: JSON.stringify({ delta }) });
     toast('Остаток обновлён');
     closeModal('modal-adjust');
     loadSupplies();
@@ -711,7 +711,7 @@ async function searchClients() {
       const data = await apiFetch(`/api/patients?size=20&page=0`);
       // Filter users with clientUser by matching name
       // We search patients that have clientUserId and match fullName
-      const allUsers = await apiFetch(`/api/patients/search?q=${encodeURIComponent(q)}&size=20`);
+      const allUsers = await apiFetch(`/api/patients?q=${encodeURIComponent(q)}&size=20`);
       const matched = (allUsers?.content || []).filter(p => p.clientUserId);
       if (matched.length === 0) {
         results.style.display = 'block';
@@ -770,7 +770,7 @@ async function saveAssignment() {
 
 async function changeStatus(id, status) {
   try {
-    await apiFetch(`/api/nurse/assignments/${id}/status?status=${status}`, { method:'PATCH' });
+    await apiFetch(`/api/nurse/assignments/${id}`, { method:'PATCH', body: JSON.stringify({ status }), headers: { 'Content-Type': 'application/json' } });
     toast(status === 'DONE' ? 'Отмечено выполненным' : 'Назначение отменено');
     loadAssignments();
     if (currentSection === 'dashboard') loadDashboard();
@@ -802,7 +802,7 @@ async function loadPatients(page = 0) {
     const params = new URLSearchParams({ page, size: 15 });
     if (q)      params.append('q', q);
     if (status) params.append('status', status);
-    data = await apiFetch('/api/patients/search?' + params);
+    data = await apiFetch('/api/patients?' + params);
   } else {
     data = await apiFetch(`/api/patients?page=${page}&size=15`);
   }
@@ -861,7 +861,7 @@ async function doAdmit() {
   const patientId = document.getElementById('admit-patientId').value;
   if (!patientId) { toast('Выберите пациента', 'warning'); return; }
   try {
-    await apiFetch(`/api/wards/${wardId}/admit/${patientId}`, { method:'POST' });
+    await apiFetch(`/api/wards/${wardId}/patients/${patientId}`, { method:'PUT' });
     toast('Пациент заселён');
     closeModal('modal-admit');
     loadWards();

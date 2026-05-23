@@ -40,6 +40,7 @@
 31. [Портал врача](#31-портал-врача)
 32. [Kubernetes: запуск в Rancher Desktop](#32-kubernetes-запуск-в-rancher-desktop)
 33. [OpenSearch — полнотекстовый поиск](#33-opensearch--полнотекстовый-поиск)
+34. [REST-дизайн API — применённые принципы](#34-rest-дизайн-api--применённые-принципы)
 
 ---
 
@@ -483,7 +484,7 @@ public class ChatMessage {
 }
 ```
 
-Сообщения читаются через **short-polling**: `GET /api/chat/rooms/{id}/messages/poll?sinceId={lastId}` — возвращает только сообщения с `id > sinceId`. Клиент опрашивает каждые 3 секунды.
+Сообщения читаются через **short-polling**: `GET /api/chat/rooms/{id}/messages?sinceId={lastId}` — возвращает только сообщения с `id > sinceId`. При первом открытии `sinceId=0` — возвращаются все сообщения. Клиент опрашивает каждые 3 секунды.
 
 ### MedicalDocument — медицинский документ
 
@@ -900,12 +901,11 @@ public void dischargePatient(Long patientId, DischargeType type) {
 | Метод | URL | Описание |
 |---|---|---|
 | POST | `/api/patients` | Создать пациента |
-| GET | `/api/patients` | Список (page, size) |
+| GET | `/api/patients` | Список (page, size); фильтры: `?q=имя`, `?status=TREATMENT` |
 | GET | `/api/patients/{id}` | По ID |
-| GET | `/api/patients/search` | Поиск по имени (?q=) и/или статусу (?status=) |
 | PUT | `/api/patients/{id}` | Обновить |
 | DELETE | `/api/patients/{id}` | Мягкое удаление |
-| PUT | `/api/patients/{patientId}/assign-doctor/{doctorId}` | Назначить врача |
+| PUT | `/api/patients/{patientId}/doctor/{doctorId}` | Назначить врача |
 | GET | `/api/patients/{patientId}/services` | Платные услуги пациента |
 
 ### Врачи `/api/doctors`
@@ -936,8 +936,8 @@ public void dischargePatient(Long patientId, DischargeType type) {
 | POST | `/api/wards` | Создать палату |
 | GET | `/api/wards` | Список всех |
 | GET | `/api/wards/{id}` | По ID |
-| POST | `/api/wards/{wardId}/admit/{patientId}` | Поместить пациента в палату |
-| POST | `/api/wards/{wardId}/discharge/{patientId}` | Выписать из палаты |
+| PUT | `/api/wards/{wardId}/patients/{patientId}` | Поместить пациента в палату |
+| DELETE | `/api/wards/{wardId}/patients/{patientId}` | Выписать из палаты |
 
 ### Платные услуги
 
@@ -947,7 +947,7 @@ public void dischargePatient(Long patientId, DischargeType type) {
 | GET | `/api/paid-services` | Список (page, size) |
 | GET | `/api/paid-services/{id}` | По ID |
 | POST | `/api/patients/{patientId}/paid-services/{serviceId}` | Назначить услугу пациенту |
-| PATCH | `/api/patients/{patientId}/paid-services/{linkId}/pay` | Отметить как оплаченную |
+| PATCH | `/api/patients/{patientId}/paid-services/{linkId}` | Обновить статус оплаты (body: `{"paid": true}`) |
 
 ### Администрирование `/api/admin` (только `ROLE_ADMIN`)
 
@@ -965,9 +965,9 @@ public void dischargePatient(Long patientId, DischargeType type) {
 | GET | `/api/client/departments` | Все (без токена) | Список активных отделений |
 | GET | `/api/client/services` | Все (без токена) | Список активных платных услуг |
 | POST | `/api/client/appointments` | `ROLE_CLIENT` | Записаться на приём к врачу |
-| GET | `/api/client/appointments/my` | `ROLE_CLIENT` | Мои записи на приём |
+| GET | `/api/client/me/appointments` | `ROLE_CLIENT` | Мои записи на приём |
 | POST | `/api/client/service-orders` | `ROLE_CLIENT` | Заказать платную услугу |
-| GET | `/api/client/service-orders/my` | `ROLE_CLIENT` | Мои заказы услуг |
+| GET | `/api/client/me/service-orders` | `ROLE_CLIENT` | Мои заказы услуг |
 
 ### Чат `/api/chat`
 
@@ -975,11 +975,10 @@ public void dischargePatient(Long patientId, DischargeType type) {
 |---|---|---|---|
 | POST | `/api/chat/support` | `ROLE_CLIENT` | Создать / получить SUPPORT-комнату |
 | GET | `/api/chat/support` | `ROLE_ADMIN` | Все SUPPORT-комнаты |
-| GET | `/api/chat/my-rooms` | `ROLE_CLIENT` | Мои чат-комнаты |
+| GET | `/api/chat/me/rooms` | `ROLE_CLIENT` | Мои чат-комнаты |
 | GET | `/api/chat/doctor/rooms` | `ROLE_DOCTOR` | Чаты этого врача |
 | POST | `/api/chat/rooms/{id}/messages` | Любой auth. | Отправить сообщение |
-| GET | `/api/chat/rooms/{id}/messages` | Любой auth. | История сообщений |
-| GET | `/api/chat/rooms/{id}/messages/poll?sinceId={n}` | Любой auth. | Polling: сообщения > n |
+| GET | `/api/chat/rooms/{id}/messages?sinceId={n}` | Любой auth. | Сообщения; sinceId=0 = все, sinceId=N = polling новых |
 
 ### Медицинская документация `/api/medical`
 
@@ -987,12 +986,12 @@ public void dischargePatient(Long patientId, DischargeType type) {
 |---|---|---|---|
 | POST | `/api/medical/documents` | `ROLE_DOCTOR` | Создать документ |
 | GET | `/api/medical/documents/patient/{id}` | `ROLE_DOCTOR`, `ROLE_ADMIN` | Документы пациента |
-| GET | `/api/medical/documents/my` | `ROLE_CLIENT` | Мои документы |
+| GET | `/api/medical/me/documents` | `ROLE_CLIENT` | Мои документы |
 | DELETE | `/api/medical/documents/{id}` | `ROLE_DOCTOR`, `ROLE_ADMIN` | Архивировать |
 | POST | `/api/medical/notes` | `ROLE_DOCTOR` | Создать заметку |
 | GET | `/api/medical/notes/patient/{id}` | `ROLE_DOCTOR`, `ROLE_ADMIN` | Заметки пациента |
 | GET | `/api/medical/history/patient/{id}` | `ROLE_DOCTOR`, `ROLE_ADMIN` | История пациента |
-| GET | `/api/medical/history/my` | `ROLE_CLIENT` | Моя история |
+| GET | `/api/medical/me/history` | `ROLE_CLIENT` | Моя история |
 
 ### Формат страничного ответа `PageResponse<T>`
 
@@ -1752,17 +1751,20 @@ src/test/java/com/hospital/
 +-- integration/
 |   +-- AbstractIntegrationTest.java      # базовый класс: проверка наличия Docker
 |   +-- TestTransactionConfig.java        # @TestConfiguration: явный JpaTransactionManager
-|   +-- AuthIntegrationTest.java          # 12 тестов: вход, регистрация, авторизация
-|   +-- PatientIntegrationTest.java       # 8 тестов: CRUD пациентов, поиск
-|   +-- ChatIntegrationTest.java          # 13 тестов: чат-система, RBAC, polling
+|   +-- AuthIntegrationTest.java          # 10 тестов: вход, регистрация, авторизация
+|   +-- PatientIntegrationTest.java       # 10 тестов: CRUD пациентов, поиск, clientUserId, авто-чат
+|   +-- ChatIntegrationTest.java          # 17 тестов: чат-система, RBAC, polling
 |   +-- MedicalIntegrationTest.java       # 23 теста: документы, заметки, история
+|   +-- PaidServiceIntegrationTest.java   # 7 тестов: CRUD услуг, назначение, оплата
+|   +-- SearchIntegrationTest.java        # 3 теста: OpenSearch index+search+delete
 |
 +-- service/
-|   +-- PatientServiceTest.java           # 10 юнит-тестов PatientService
+|   +-- PatientServiceTest.java           # 16 юнит-тестов PatientService
 |   +-- WardServiceTest.java              # 5 юнит-тестов WardService
 |   +-- AdminServiceTest.java             # 9 юнит-тестов AdminService
-|   +-- ChatServiceTest.java              # 25 юнит-тестов ChatService
+|   +-- ChatServiceTest.java              # 24 юнит-теста ChatService
 |   +-- MedicalServiceTest.java           # 21 юнит-тест MedicalService
+|   +-- SearchServiceTest.java            # 6 юнит-тестов: graceful no-op без OpenSearch
 |
 +-- config/
     +-- JwtUtilTest.java                  # 5 тестов генерации и валидации JWT
@@ -1772,16 +1774,19 @@ src/test/java/com/hospital/
 
 | Класс | Тип | Тестов | Что проверяет |
 |---|---|---|---|
-| `PatientServiceTest` | Unit | 10 | Создание, soft-delete, поиск, назначение врача |
+| `PatientServiceTest` | Unit | 16 | Создание, soft-delete, поиск, назначение врача, clientUserId, авто-чат |
 | `WardServiceTest` | Unit | 5 | Поступление, выписка, заполненность палат |
-| `AdminServiceTest` | Unit | 9 | Финансовые отчёты, Redis кэш |
-| `ChatServiceTest` | Unit | 25 | getOrCreate (идемпотентность), IDOR, polling |
-| `MedicalServiceTest` | Unit | 21 | Документы, заметки, патиент-история |
+| `AdminServiceTest` | Unit | 9 | Финансовые отчёты, Redis кэш, Strategy pattern |
+| `ChatServiceTest` | Unit | 24 | getOrCreate (идемпотентность), IDOR, polling, двунаправленный чат |
+| `MedicalServiceTest` | Unit | 21 | Документы, заметки, типы/labels, история пациента |
+| `SearchServiceTest` | Unit | 6 | Graceful no-op когда OpenSearchClient=null |
 | `JwtUtilTest` | Unit | 5 | Генерация/валидация/истечение JWT |
-| `AuthIntegrationTest` | Integration | 12 | Login, register, RBAC 401/403 |
-| `PatientIntegrationTest` | Integration | 8 | CRUD пациентов HTTP end-to-end |
-| `ChatIntegrationTest` | Integration | 13 | Комнаты, сообщения, polling end-to-end |
-| `MedicalIntegrationTest` | Integration | 23 | Документы и заметки HTTP end-to-end |
+| `AuthIntegrationTest` | Integration | 10 | Login, register, RBAC 401/403 |
+| `PatientIntegrationTest` | Integration | 10 | CRUD пациентов HTTP end-to-end, clientUserId, авто-чат-комната |
+| `ChatIntegrationTest` | Integration | 17 | Комнаты, сообщения, polling, RBAC, двунаправленный чат |
+| `MedicalIntegrationTest` | Integration | 23 | Документы и заметки HTTP end-to-end, RBAC |
+| `PaidServiceIntegrationTest` | Integration | 7 | CRUD услуг, назначение пациенту, отметка оплаты |
+| `SearchIntegrationTest` | Integration | 3 | Реальный OpenSearch через Testcontainers: index+search+delete |
 
 ### Юнит-тесты (Mockito)
 
@@ -2542,12 +2547,12 @@ Auth guard: при отсутствии `clientToken` в localStorage — ред
 | Раздел (левый сайдбар) | API | Описание |
 |---|---|---|
 | Обзор | — | Статистика + последние записи/заказы |
-| Записи к врачу | `GET /api/client/appointments/my` | Список с фильтром статуса |
-| Заказы услуг | `GET /api/client/service-orders/my` | Список с фильтром статуса |
-| Мои документы | `GET /api/medical/documents/my` | Медицинские документы, выданные врачом |
-| История болезни | `GET /api/medical/history/my` | Заметки врача (только `visibleToClient=true`) |
+| Записи к врачу | `GET /api/client/me/appointments` | Список с фильтром статуса |
+| Заказы услуг | `GET /api/client/me/service-orders` | Список с фильтром статуса |
+| Мои документы | `GET /api/medical/me/documents` | Медицинские документы, выданные врачом |
+| История болезни | `GET /api/medical/me/history` | Заметки врача (только `visibleToClient=true`) |
 | Чат поддержки | `POST /api/chat/support` + polling | Переписка с администрацией |
-| Чат с врачом | `GET /api/chat/my-rooms` + polling | Список комнат + переписка |
+| Чат с врачом | `GET /api/chat/me/rooms` + polling | Список комнат + переписка |
 
 ### Backend: новые компоненты
 
@@ -2607,11 +2612,10 @@ users (ROLE_CLIENT)
 |---|---|---|---|
 | `POST` | `/api/chat/support` | `ROLE_CLIENT` | Создать или получить SUPPORT-комнату |
 | `GET` | `/api/chat/support` | `ROLE_ADMIN` | Список всех SUPPORT-комнат |
-| `GET` | `/api/chat/my-rooms` | `ROLE_CLIENT` | Все комнаты текущего клиента |
+| `GET` | `/api/chat/me/rooms` | `ROLE_CLIENT` | Все комнаты текущего клиента |
 | `GET` | `/api/chat/doctor/rooms` | `ROLE_DOCTOR` | Все комнаты, где врач — участник |
 | `POST` | `/api/chat/rooms/{roomId}/messages` | Любой auth. | Отправить сообщение |
-| `GET` | `/api/chat/rooms/{roomId}/messages` | Любой auth. | История сообщений комнаты |
-| `GET` | `/api/chat/rooms/{roomId}/messages/poll?sinceId={n}` | Любой auth. | Polling: новые сообщения с id > n |
+| `GET` | `/api/chat/rooms/{roomId}/messages?sinceId={n}` | Любой auth. | Сообщения; sinceId=0 = все, sinceId=N = только новее N |
 
 ### Short-polling
 
@@ -2717,12 +2721,12 @@ users (ROLE_ADMIN/DOCTOR) ──────────── │ (staff_user_i
 |---|---|---|---|
 | `POST` | `/api/medical/documents` | `ROLE_DOCTOR` | Создать документ |
 | `GET` | `/api/medical/documents/patient/{id}` | `ROLE_DOCTOR` / `ROLE_ADMIN` | Документы пациента |
-| `GET` | `/api/medical/documents/my` | `ROLE_CLIENT` | Мои документы (только `visibleToClient`) |
+| `GET` | `/api/medical/me/documents` | `ROLE_CLIENT` | Мои документы (только `visibleToClient`) |
 | `DELETE` | `/api/medical/documents/{id}` | `ROLE_DOCTOR` / `ROLE_ADMIN` | Архивировать (soft-delete) |
 | `POST` | `/api/medical/notes` | `ROLE_DOCTOR` | Создать заметку |
 | `GET` | `/api/medical/notes/patient/{id}` | `ROLE_DOCTOR` / `ROLE_ADMIN` | Заметки пациента |
 | `GET` | `/api/medical/history/patient/{id}` | `ROLE_DOCTOR` / `ROLE_ADMIN` | Агрегированная история |
-| `GET` | `/api/medical/history/my` | `ROLE_CLIENT` | Моя история (только видимые) |
+| `GET` | `/api/medical/me/history` | `ROLE_CLIENT` | Моя история (только видимые) |
 
 ### Создание документа — пример запроса
 
@@ -2767,7 +2771,7 @@ POST /api/medical/notes
 }
 ```
 
-Для `GET /api/medical/history/my` (ROLE_CLIENT) документы фильтруются по `active=true`, заметки — по `visibleToClient=true`.
+Для `GET /api/medical/me/history` (ROLE_CLIENT) документы фильтруются по `active=true`, заметки — по `visibleToClient=true`.
 
 ### Soft-delete документов
 
@@ -2819,7 +2823,7 @@ GET /api/doctors/me  →  DoctorResponse
 |---|---|---|
 | Dashboard | `GET /api/patients`, `GET /api/chat/doctor/rooms` | Статистика + последние пациенты и чаты |
 | Мои пациенты | `GET /api/patients?doctorId={id}` | Карточки пациентов с поиском и фильтром статуса |
-| Приёмы | `GET /api/client/appointments/my` (по doctorId) | Записи клиентов к этому врачу. Кнопка «+ В пациенты» — зачислить клиента как HIS-пациента |
+| Приёмы | `GET /api/client/me/appointments` (по doctorId) | Записи клиентов к этому врачу. Кнопка «+ В пациенты» — зачислить клиента как HIS-пациента |
 | Чаты | `GET /api/chat/doctor/rooms` + polling | Все чаты врача с клиентами |
 
 ### Панель деталей пациента
@@ -3150,5 +3154,71 @@ opensearch:
 |---|---|---|---|
 | `SearchServiceTest` | Unit | 6 | no-op режим при client=null (тесты без OpenSearch) |
 | `SearchIntegrationTest` | Integration (TC) | 3 | Реальная индексация и поиск через Testcontainers |
+
+---
+
+## 34. REST-дизайн API — применённые принципы
+
+В ходе рефакторинга контроллеры были приведены к единому REST-стилю. Ниже — принципы и конкретные решения.
+
+### Принцип 1: только существительные в URL, глаголы — через HTTP-методы
+
+Глагол в URL нарушает REST — метод HTTP уже является «глаголом».
+
+| До (глагол в URL) | После (ресурс + метод) |
+|---|---|
+| `PUT /patients/{id}/assign-doctor/{did}` | `PUT /patients/{id}/doctor/{did}` |
+| `POST /wards/{id}/admit/{pid}` | `PUT /wards/{id}/patients/{pid}` |
+| `POST /wards/{id}/discharge/{pid}` | `DELETE /wards/{id}/patients/{pid}` |
+| `PATCH .../paid-services/{id}/pay` | `PATCH .../paid-services/{id}` + body `{"paid": true}` |
+| `PATCH /nurse/supplies/{id}/adjust` | `PATCH /nurse/supplies/{id}` + body `{"delta": N}` |
+| `PATCH /nurse/assignments/{id}/status?status=X` | `PATCH /nurse/assignments/{id}` + body `{"status": "X"}` |
+
+`PUT /wards/{id}/patients/{pid}` читается как «установить пациента в палату» — семантика HTTP PUT (установить ресурс). `DELETE` — убрать связь. Никаких `/admit`, `/discharge`, `/pay`, `/adjust` в пути.
+
+### Принцип 2: фильтрация коллекций через query-параметры
+
+Отдельный эндпоинт `/search` — нарушение: search не ресурс, а операция над коллекцией.
+
+```
+GET /api/patients/search?q=Иван&status=TREATMENT  ← до
+GET /api/patients?q=Иван&status=TREATMENT         ← после
+```
+
+Один эндпоинт `/patients` с опциональными параметрами `q` и `status`. Если параметры не переданы — возвращается весь список.
+
+### Принцип 3: `/me` для ресурсов текущего пользователя
+
+`/my` — разговорная форма, не является REST-стандартом. `/me` — принятое соглашение (используется в GitHub API, Spotify Web API и др.).
+
+```
+GET /api/client/appointments/my   → GET /api/client/me/appointments
+GET /api/chat/my-rooms            → GET /api/chat/me/rooms
+GET /api/medical/documents/my     → GET /api/medical/me/documents
+```
+
+Структура `/me/ресурс` читается как «мои ресурсы» — субъект перед объектом.
+
+### Принцип 4: объединение дублирующих эндпоинтов
+
+Два эндпоинта для одного ресурса с разными режимами работы — лишняя поверхность API.
+
+```
+GET /rooms/{id}/messages         ← возвращает все сообщения
+GET /rooms/{id}/messages/poll?sinceId=N  ← только новые
+```
+
+После: один эндпоинт `GET /rooms/{id}/messages?sinceId=N`. При `sinceId=0` — возвращает всё (первоначальная загрузка). При `sinceId=N` — только новые (polling). Поведение определяется параметром, а не URL.
+
+### Принцип 5: тело запроса для PATCH, не query-параметры
+
+Query-параметры в PATCH-запросах нарушают семантику: тело запроса предназначено для описания изменения ресурса.
+
+```
+PATCH /assignments/{id}/status?status=DONE         ← до: статус в query param
+PATCH /assignments/{id}  + body {"status": "DONE"} ← после: статус в теле
+```
+
+Добавлены DTO: `UpdateAssignmentStatusRequest`, `UpdatePaidStatusRequest` для строгой типизации.
 
 `SearchIntegrationTest` использует `GenericContainer` с `opensearchproject/opensearch:2.17.0` и `@DynamicPropertySource` для подстановки порта. Профиль `test` не используется — чтобы не отключался OpenSearch (свойства передаются inline через `properties = {...}`).

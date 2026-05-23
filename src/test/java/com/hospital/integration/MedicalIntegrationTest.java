@@ -428,7 +428,7 @@ class MedicalIntegrationTest extends AbstractIntegrationTest {
     void getMyDocuments_asClient_returns200() throws Exception {
         String clientToken = login("client1", "client123");
 
-        mockMvc.perform(get("/api/medical/documents/my")
+        mockMvc.perform(get("/api/medical/me/documents")
                         .header("Authorization", "Bearer " + clientToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
@@ -442,7 +442,7 @@ class MedicalIntegrationTest extends AbstractIntegrationTest {
     void getMyDocuments_asDoctor_returns403() throws Exception {
         String doctorToken = login("doctor1", "doctor123");
 
-        mockMvc.perform(get("/api/medical/documents/my")
+        mockMvc.perform(get("/api/medical/me/documents")
                         .header("Authorization", "Bearer " + doctorToken))
                 .andExpect(status().isForbidden());
     }
@@ -452,7 +452,7 @@ class MedicalIntegrationTest extends AbstractIntegrationTest {
      */
     @Test
     void getMyDocuments_withoutToken_returns401() throws Exception {
-        mockMvc.perform(get("/api/medical/documents/my"))
+        mockMvc.perform(get("/api/medical/me/documents"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -469,7 +469,7 @@ class MedicalIntegrationTest extends AbstractIntegrationTest {
     void getMyHistory_asClient_returns200() throws Exception {
         String clientToken = login("client1", "client123");
 
-        mockMvc.perform(get("/api/medical/history/my")
+        mockMvc.perform(get("/api/medical/me/history")
                         .header("Authorization", "Bearer " + clientToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.notes").isArray())
@@ -483,7 +483,7 @@ class MedicalIntegrationTest extends AbstractIntegrationTest {
     void getMyHistory_asDoctor_returns403() throws Exception {
         String doctorToken = login("doctor1", "doctor123");
 
-        mockMvc.perform(get("/api/medical/history/my")
+        mockMvc.perform(get("/api/medical/me/history")
                         .header("Authorization", "Bearer " + doctorToken))
                 .andExpect(status().isForbidden());
     }
@@ -493,7 +493,7 @@ class MedicalIntegrationTest extends AbstractIntegrationTest {
      */
     @Test
     void getMyHistory_withoutToken_returns401() throws Exception {
-        mockMvc.perform(get("/api/medical/history/my"))
+        mockMvc.perform(get("/api/medical/me/history"))
                 .andExpect(status().isUnauthorized());
     }
 

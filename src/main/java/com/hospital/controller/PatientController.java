@@ -134,49 +134,17 @@ public class PatientController {
      * @return страница с пациентами и метаданными пагинации, HTTP 200 OK
      */
     @GetMapping
-    @Operation(summary = "Get all active patients (paginated)")
+    @Operation(summary = "Get active patients — optional filters: ?q=name&status=TREATMENT")
     public ResponseEntity<PageResponse<PatientResponse>> getAll(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(patientService.getAll(PageRequest.of(page, size, Sort.by("id"))));
-    }
-
-    /**
-     * Ищет пациентов по имени и/или статусу с пагинацией.
-     *
-     * <p><b>Поиск через @RequestParam(required = false)</b> — параметры {@code q}
-     * (строка поиска) и {@code status} не обязательны. Если оба не указаны,
-     * вернётся список всех пациентов. Примеры URL:
-     * <ul>
-     *   <li>{@code /api/patients/search?q=Барсик} — поиск по имени</li>
-     *   <li>{@code /api/patients/search?status=ADMITTED} — фильтр по статусу</li>
-     *   <li>{@code /api/patients/search?q=Мурзик&status=DISCHARGED&page=1}</li>
-     * </ul></p>
-     *
-     * <p><b>PatientStatus status</b> — Spring автоматически конвертирует строку
-     * из URL (например, "ADMITTED") в значение enum {@link PatientStatus}
-     * благодаря встроенному {@code StringToEnumConverter}.
-     * Если строка не соответствует ни одному значению enum — HTTP 400.</p>
-     *
-     * <p><b>Отдельный эндпоинт /search vs параметры на GET /</b>:
-     * Оба подхода валидны. Отдельный путь {@code /search} делает намерение
-     * очевидным и упрощает маршрутизацию в сложных случаях.</p>
-     *
-     * @param q      строка поиска по имени (необязательно)
-     * @param status фильтр по статусу пациента (необязательно)
-     * @param page   номер страницы, по умолчанию 0
-     * @param size   размер страницы, по умолчанию 20
-     * @return страница с найденными пациентами, HTTP 200 OK
-     */
-    @GetMapping("/search")
-    @Operation(summary = "Search patients by name and/or status")
-    public ResponseEntity<PageResponse<PatientResponse>> search(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) PatientStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(patientService.search(q, status,
-                PageRequest.of(page, size, Sort.by("id"))));
+        PageRequest pageable = PageRequest.of(page, size, Sort.by("id"));
+        if (q != null || status != null) {
+            return ResponseEntity.ok(patientService.search(q, status, pageable));
+        }
+        return ResponseEntity.ok(patientService.getAll(pageable));
     }
 
     /**
@@ -257,7 +225,7 @@ public class PatientController {
      * @param doctorId  идентификатор врача для назначения
      * @return обновлённый пациент с назначенным врачом, HTTP 200 OK
      */
-    @PutMapping("/{patientId}/assign-doctor/{doctorId}")
+    @PutMapping("/{patientId}/doctor/{doctorId}")
     @Operation(summary = "Assign a doctor to patient")
     public ResponseEntity<PatientResponse> assignDoctor(
             @PathVariable Long patientId,

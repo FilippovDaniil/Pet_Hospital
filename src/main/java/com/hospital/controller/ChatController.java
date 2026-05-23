@@ -139,7 +139,7 @@ public class ChatController {
      *
      * <p>Доступ: {@code ROLE_CLIENT}.
      */
-    @GetMapping("/my-rooms")
+    @GetMapping("/me/rooms")
     @Operation(summary = "Клиент: список всех своих чатов")
     public List<ChatRoomResponse> getMyRooms(Authentication auth) {
         return chatService.getMyRooms(currentUser(auth));
@@ -164,28 +164,21 @@ public class ChatController {
      * @param roomId идентификатор чат-комнаты
      * @param auth   JWT-аутентификация запрашивающего пользователя
      */
+    /**
+     * Возвращает сообщения комнаты. Опциональный параметр {@code sinceId}
+     * (по умолчанию 0) позволяет делать polling: клиент передаёт id
+     * последнего полученного сообщения — сервер вернёт только новые.
+     * sinceId=0 (по умолчанию) — вернуть всю историю.
+     */
     @GetMapping("/rooms/{roomId}/messages")
-    @Operation(summary = "Получить все сообщения комнаты")
-    public List<ChatMessageResponse> getMessages(@PathVariable Long roomId, Authentication auth) {
-        return chatService.getRoomMessages(roomId, currentUser(auth));
+    @Operation(summary = "Сообщения комнаты; ?sinceId=N для polling (default 0 = все)")
+    public List<ChatMessageResponse> getMessages(
+            @PathVariable Long roomId,
+            @RequestParam(defaultValue = "0") Long sinceId,
+            Authentication auth) {
+        return chatService.pollMessages(roomId, sinceId, currentUser(auth));
     }
 
-    /**
-     * Отправляет новое сообщение в указанную чат-комнату.
-     *
-     * <p>Тело запроса валидируется аннотацией {@code @Valid}: поле {@code content}
-     * не может быть пустым. Сервис дополнительно проверяет членство отправителя
-     * в комнате.
-     *
-     * <p>Возвращает HTTP 201 Created с созданным сообщением, чтобы клиент мог
-     * немедленно отобразить его без дополнительного запроса.
-     *
-     * <p>Доступ: участник комнаты.
-     *
-     * @param roomId  идентификатор чат-комнаты
-     * @param request тело с текстом сообщения
-     * @param auth    JWT-аутентификация отправителя
-     */
     @PostMapping("/rooms/{roomId}/messages")
     @Operation(summary = "Отправить сообщение в комнату")
     public ResponseEntity<ChatMessageResponse> sendMessage(
@@ -194,33 +187,6 @@ public class ChatController {
             Authentication auth) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(chatService.sendMessage(roomId, request, currentUser(auth)));
-    }
-
-    /**
-     * Возвращает только новые сообщения, появившиеся после {@code sinceId}.
-     *
-     * <p>Реализует механизм <b>long polling</b> / short polling для обновления
-     * чата без WebSocket: клиент периодически запрашивает этот эндпоинт,
-     * передавая идентификатор последнего известного сообщения. В ответ приходят
-     * только более новые записи, что минимизирует трафик.
-     *
-     * <p>При значении {@code sinceId = 0} возвращаются все сообщения комнаты
-     * (аналогично {@code GET /rooms/{roomId}/messages}).
-     *
-     * <p>Доступ: участник комнаты.
-     *
-     * @param roomId  идентификатор чат-комнаты
-     * @param sinceId идентификатор последнего полученного сообщения;
-     *                по умолчанию 0 (вернуть все)
-     * @param auth    JWT-аутентификация запрашивающего пользователя
-     */
-    @GetMapping("/rooms/{roomId}/messages/poll")
-    @Operation(summary = "Опрос новых сообщений (polling) с момента sinceId")
-    public List<ChatMessageResponse> pollMessages(
-            @PathVariable Long roomId,
-            @RequestParam(defaultValue = "0") Long sinceId,
-            Authentication auth) {
-        return chatService.pollMessages(roomId, sinceId, currentUser(auth));
     }
 
     // ─────────────────────────────────────────────

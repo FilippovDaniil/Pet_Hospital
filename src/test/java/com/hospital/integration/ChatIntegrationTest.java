@@ -227,7 +227,7 @@ class ChatIntegrationTest extends AbstractIntegrationTest {
         // getContentAsString(UTF_8) — явно указываем кодировку, иначе на Windows
         // getContentAsString() использует системную кодировку (CP-1252) и кириллица искажается.
         MvcResult pollResult = mockMvc.perform(
-                        get("/api/chat/rooms/{roomId}/messages/poll", roomId)
+                        get("/api/chat/rooms/{roomId}/messages", roomId)
                                 .header("Authorization", "Bearer " + clientToken)
                                 .param("sinceId", "0"))
                 .andExpect(status().isOk())
@@ -316,7 +316,7 @@ class ChatIntegrationTest extends AbstractIntegrationTest {
     void getMyRooms_asClient_returns200() throws Exception {
         String clientToken = login("client1", "client123");
 
-        mockMvc.perform(get("/api/chat/my-rooms")
+        mockMvc.perform(get("/api/chat/me/rooms")
                         .header("Authorization", "Bearer " + clientToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
@@ -330,7 +330,7 @@ class ChatIntegrationTest extends AbstractIntegrationTest {
     void getMyRooms_asDoctor_returns403() throws Exception {
         String doctorToken = login("doctor1", "doctor123");
 
-        mockMvc.perform(get("/api/chat/my-rooms")
+        mockMvc.perform(get("/api/chat/me/rooms")
                         .header("Authorization", "Bearer " + doctorToken))
                 .andExpect(status().isForbidden());
     }
@@ -340,7 +340,7 @@ class ChatIntegrationTest extends AbstractIntegrationTest {
      */
     @Test
     void getMyRooms_withoutToken_returns401() throws Exception {
-        mockMvc.perform(get("/api/chat/my-rooms"))
+        mockMvc.perform(get("/api/chat/me/rooms"))
                 .andExpect(status().isUnauthorized());
     }
 

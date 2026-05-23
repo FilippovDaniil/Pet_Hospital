@@ -1,6 +1,7 @@
 package com.hospital.controller;
 
 import com.hospital.dto.request.CreatePaidServiceRequest;
+import com.hospital.dto.request.UpdatePaidStatusRequest;
 import com.hospital.dto.response.PageResponse;
 import com.hospital.dto.response.PaidServiceResponse;
 import com.hospital.dto.response.PatientPaidServiceResponse;
@@ -51,11 +52,12 @@ public class PaidServiceController {
                 .body(paidServiceService.assignToPatient(patientId, serviceId));
     }
 
-    @PatchMapping("/api/patients/{patientId}/paid-services/{linkId}/pay")
-    @Operation(summary = "Mark a patient's service as paid")
+    @PatchMapping("/api/patients/{patientId}/paid-services/{linkId}")
+    @Operation(summary = "Update a patient's service assignment (e.g. mark as paid)")
     public ResponseEntity<PatientPaidServiceResponse> markPaid(
             @PathVariable Long patientId,
-            @PathVariable Long linkId) {
+            @PathVariable Long linkId,
+            @RequestBody UpdatePaidStatusRequest request) {
         return ResponseEntity.ok(paidServiceService.markPaid(patientId, linkId));
     }
 }

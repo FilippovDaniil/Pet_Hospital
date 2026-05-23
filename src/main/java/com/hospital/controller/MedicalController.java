@@ -127,7 +127,7 @@ public class MedicalController {
      *
      * <p>Доступ: {@code ROLE_CLIENT}.
      */
-    @GetMapping("/documents/my")
+    @GetMapping("/me/documents")
     @Operation(summary = "Клиент: свои медицинские документы")
     public List<MedicalDocumentResponse> getMyDocuments(Authentication auth) {
         return medicalService.getMyDocuments(currentUser(auth));
@@ -209,7 +209,7 @@ public class MedicalController {
      *
      * <p>Доступ: {@code ROLE_CLIENT}.
      */
-    @GetMapping("/history/my")
+    @GetMapping("/me/history")
     @Operation(summary = "Клиент: своя медицинская история")
     public PatientHistoryResponse getMyHistory(Authentication auth) {
         return medicalService.getMyHistory(currentUser(auth));

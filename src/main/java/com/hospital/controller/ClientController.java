@@ -55,7 +55,7 @@ public class ClientController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @GetMapping("/appointments/my")
+    @GetMapping("/me/appointments")
     @Operation(summary = "Мои записи к врачу (требует ROLE_CLIENT)")
     public ResponseEntity<List<AppointmentResponse>> getMyAppointments(Authentication authentication) {
         return ResponseEntity.ok(clientService.getMyAppointments(authentication.getName()));
@@ -70,13 +70,13 @@ public class ClientController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @GetMapping("/service-orders/my")
+    @GetMapping("/me/service-orders")
     @Operation(summary = "Мои заказы услуг (требует ROLE_CLIENT)")
     public ResponseEntity<List<ServiceOrderResponse>> getMyOrders(Authentication authentication) {
         return ResponseEntity.ok(clientService.getMyOrders(authentication.getName()));
     }
 
-    @GetMapping("/my-assignments")
+    @GetMapping("/me/assignments")
     @Operation(summary = "Мои назначения от медсестры (требует ROLE_CLIENT)")
     public ResponseEntity<List<NurseAssignmentResponse>> getMyAssignments(Authentication authentication) {
         User user = userRepository.findByUsername(authentication.getName()).orElseThrow();

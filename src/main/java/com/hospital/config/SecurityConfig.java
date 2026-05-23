@@ -163,7 +163,7 @@ public class SecurityConfig {
                 // Чат клиента с врачом: инициировать может и клиент (doctorUserId в пути), и врач (clientUserId в пути)
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/chat/doctor/**").hasAnyRole("CLIENT", "DOCTOR")
                 .requestMatchers("/api/chat/doctor/rooms").hasRole("DOCTOR")
-                .requestMatchers("/api/chat/my-rooms").hasRole("CLIENT")
+                .requestMatchers("/api/chat/me/rooms").hasRole("CLIENT")
                 // Сообщения — доступны всем аутентифицированным участникам (проверка в сервисе)
                 .requestMatchers("/api/chat/rooms/**").authenticated()
 
@@ -173,7 +173,7 @@ public class SecurityConfig {
                 .requestMatchers(org.springframework.http.HttpMethod.GET,
                         "/api/medical/documents/patient/**", "/api/medical/history/patient/**").hasRole("DOCTOR")
                 .requestMatchers(org.springframework.http.HttpMethod.GET,
-                        "/api/medical/documents/my", "/api/medical/history/my").hasRole("CLIENT")
+                        "/api/medical/me/documents", "/api/medical/me/history").hasRole("CLIENT")
 
                 // Полнотекстовый поиск через OpenSearch
                 .requestMatchers("/api/search/**").hasAnyRole("ADMIN", "DOCTOR", "NURSE")

@@ -1021,7 +1021,7 @@ function startChatPoll() {
   chatTimer = setInterval(async () => {
     if (!chatRoomId) return;
     try {
-      const msgs = await api(`/api/chat/rooms/${chatRoomId}/messages/poll?sinceId=${chatLastId}`);
+      const msgs = await api(`/api/chat/rooms/${chatRoomId}/messages?sinceId=${chatLastId}`);
       if (!msgs?.length) return;
       chatLastId = msgs[msgs.length-1].id;
       // update main chat area if on chats page
@@ -1122,7 +1122,7 @@ async function saveRegisteredPatient() {
       clientUserId,
     });
     if (myDoctor?.id) {
-      await api(`/api/patients/${patient.id}/assign-doctor/${myDoctor.id}`, 'PUT');
+      await api(`/api/patients/${patient.id}/doctor/${myDoctor.id}`, 'PUT');
     }
     toast('Пациент зачислен и назначен вам', 'success');
     closeRegisterModal();

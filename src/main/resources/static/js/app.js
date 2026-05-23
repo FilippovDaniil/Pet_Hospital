@@ -277,7 +277,7 @@ async function searchPatients(page = 0) {
   if (q)      params.append('q', q);
   if (status) params.append('status', status);
 
-  const data = await api(`/api/patients/search?${params}`);
+  const data = await api(`/api/patients?${params}`);
   if (!data) return;
 
   $('patients-table').innerHTML = data.content.length === 0
@@ -343,7 +343,7 @@ async function doAssignDoctor() {
   const patientId = $('assign-patientId').value;
   const doctorId = $('assign-doctorId').value;
   try {
-    await api(`/api/patients/${patientId}/assign-doctor/${doctorId}`, { method: 'PUT' });
+    await api(`/api/patients/${patientId}/doctor/${doctorId}`, { method: 'PUT' });
     toast('Врач назначен');
     closeModal('modal-assign-doctor');
     loadPatients(patientsPage);
@@ -392,7 +392,7 @@ async function doAssignService() {
 
 async function markPaid(patientId, linkId) {
   try {
-    await api(`/api/patients/${patientId}/paid-services/${linkId}/pay`, { method: 'PATCH' });
+    await api(`/api/patients/${patientId}/paid-services/${linkId}`, { method: 'PATCH', body: JSON.stringify({ paid: true }), headers: { 'Content-Type': 'application/json' } });
     toast('Отмечено как оплачено');
     openPatientServicesModal(patientId, $('services-patient-name').textContent);
   } catch (_) {}
@@ -842,7 +842,7 @@ function startChatPoll() {
   chatPollTimer = setInterval(async () => {
     if (!activeChatRoomId) return;
     try {
-      const msgs = await api(`/api/chat/rooms/${activeChatRoomId}/messages/poll?sinceId=${chatLastMsgId}`);
+      const msgs = await api(`/api/chat/rooms/${activeChatRoomId}/messages?sinceId=${chatLastMsgId}`);
       if (msgs && msgs.length > 0) {
         renderChatMessages(msgs, false);
         chatLastMsgId = msgs[msgs.length - 1].id;

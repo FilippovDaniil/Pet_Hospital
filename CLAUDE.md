@@ -280,7 +280,7 @@ src/main/resources/
 | `ROLE_ADMIN` | admin.html | `/api/admin/**`, `GET /api/chat/support`, все остальные |
 | `ROLE_DOCTOR` | doctor.html | `/api/patients/**`, `/api/doctors/**`, `/api/doctors/me`, `/api/medical/**` (write/read), `GET /api/chat/doctor/rooms` |
 | `ROLE_NURSE` | nurse.html | `/api/patients/**` (ограниченно) |
-| `ROLE_CLIENT` | client.html + account.html | `/api/client/**`, `POST /api/chat/support`, `POST /api/chat/doctor/**`, `GET /api/chat/my-rooms`, `GET /api/medical/documents/my`, `GET /api/medical/history/my` |
+| `ROLE_CLIENT` | client.html + account.html | `/api/client/**`, `POST /api/chat/support`, `POST /api/chat/doctor/**`, `GET /api/chat/me/rooms`, `GET /api/medical/me/documents`, `GET /api/medical/me/history` |
 
 Публичный доступ без токена:
 - `GET /api/client/doctors`, `GET /api/client/departments`, `GET /api/client/services`
@@ -293,7 +293,7 @@ POST /api/chat/support          → ROLE_CLIENT   (создать/получит
 GET  /api/chat/support          → ROLE_ADMIN    (список всех комнат поддержки)
 POST /api/chat/doctor/{userId}  → ROLE_CLIENT   (создать/получить комнату с врачом)
 GET  /api/chat/doctor/rooms     → ROLE_DOCTOR   (список чатов врача)
-GET  /api/chat/my-rooms         → ROLE_CLIENT   (все мои чаты)
+GET  /api/chat/me/rooms         → ROLE_CLIENT   (все мои чаты)
 /api/chat/rooms/**              → authenticated (любой, доступ проверяет сервис)
 ```
 
@@ -304,8 +304,8 @@ POST /api/medical/documents                  → ROLE_DOCTOR
 POST /api/medical/notes                      → ROLE_DOCTOR
 GET  /api/medical/documents/patient/{id}     → ROLE_DOCTOR
 GET  /api/medical/history/patient/{id}       → ROLE_DOCTOR
-GET  /api/medical/documents/my               → ROLE_CLIENT
-GET  /api/medical/history/my                 → ROLE_CLIENT
+GET  /api/medical/me/documents               → ROLE_CLIENT
+GET  /api/medical/me/history                 → ROLE_CLIENT
 ```
 
 ### Поиск — SecurityConfig правила
@@ -348,9 +348,9 @@ PLAINTEXT_HOST://localhost:9092 # для хоста
 
 Чат работает без WebSocket. Клиент каждые 3 секунды вызывает:
 ```
-GET /api/chat/rooms/{roomId}/messages/poll?sinceId={lastMessageId}
+GET /api/chat/rooms/{roomId}/messages?sinceId={lastMessageId}
 ```
-Репозиторий возвращает только сообщения с `id > sinceId`. При первом открытии `sinceId=0`.
+Репозиторий возвращает только сообщения с `id > sinceId`. При первом открытии `sinceId=0` (возвращает все сообщения). Отдельного `/poll` эндпоинта нет — тот же `/messages` с query-параметром.
 
 ### Chat: orElseGet() обязателен в getOrCreate
 
@@ -568,9 +568,9 @@ response.getContentAsString(StandardCharsets.UTF_8)
 | GET | `/api/client/departments` | permitAll | Все отделения |
 | GET | `/api/client/services` | permitAll | Активные платные услуги |
 | POST | `/api/client/appointments` | ROLE_CLIENT | Создать запись к врачу |
-| GET | `/api/client/appointments/my` | ROLE_CLIENT | Записи текущего пользователя |
+| GET | `/api/client/me/appointments` | ROLE_CLIENT | Записи текущего пользователя |
 | POST | `/api/client/service-orders` | ROLE_CLIENT | Создать заказ услуги |
-| GET | `/api/client/service-orders/my` | ROLE_CLIENT | Заказы текущего пользователя |
+| GET | `/api/client/me/service-orders` | ROLE_CLIENT | Заказы текущего пользователя |
 
 ### Статусы
 
@@ -679,3 +679,74 @@ V7-миграция — резервный fallback (no-op при первом �
 ```
 
 Grafana: http://localhost:3000 → Explore → Loki → `{app="pet-hospital"}`
+
+---
+
+## REST-дизайн API — применённые принципы
+
+### Ключевые решения рефакторинга контроллеров
+
+**1. Фильтрация через query-параметры вместо отдельных эндпоинтов**
+```
+GET /api/patients/search?q=Иван&status=TREATMENT  ← до
+GET /api/patients?q=Иван&status=TREATMENT         ← после
+```
+`/search` — это глагол, нарушает принцип «только существительные». Коллекция `/patients` принимает фильтры через параметры.
+
+**2. `/me` вместо `/my` для ресурсов текущего пользователя**
+```
+GET /api/client/appointments/my     ← до
+GET /api/client/me/appointments     ← после
+```
+`/me` — стандартное соглашение (GitHub, Spotify API). Ресурс идёт после субъекта: `/me/appointments`.
+
+**3. Ресурсный путь вместо глагольных URL**
+```
+PUT /api/patients/{id}/assign-doctor/{doctorId}  ← до (глагол в URL)
+PUT /api/patients/{id}/doctor/{doctorId}         ← после (ресурс)
+
+PUT /api/wards/{id}/admit/{patientId}            ← до
+PUT /api/wards/{id}/patients/{patientId}         ← после (HTTP PUT = установить связь)
+
+DELETE /api/wards/{id}/discharge/{patientId}     ← до
+DELETE /api/wards/{id}/patients/{patientId}      ← после (HTTP DELETE = убрать связь)
+```
+
+**4. Тело запроса для PATCH вместо глагола в URL и query-параметра**
+```
+PATCH /api/patients/{pid}/paid-services/{lid}/pay                  ← до
+PATCH /api/patients/{pid}/paid-services/{lid}  + body {paid: true} ← после
+
+PATCH /api/nurse/supplies/{id}/adjust   + body {delta}  ← до
+PATCH /api/nurse/supplies/{id}          + body {delta}  ← после
+
+PATCH /api/nurse/assignments/{id}/status?status=DONE       ← до
+PATCH /api/nurse/assignments/{id}  + body {status: "DONE"} ← после
+```
+
+**5. Объединение дублирующих эндпоинтов (messages + poll)**
+```
+GET /api/chat/rooms/{id}/messages            ← история (без параметра)
+GET /api/chat/rooms/{id}/messages/poll?sinceId=N ← polling ← до (два отдельных URL)
+
+GET /api/chat/rooms/{id}/messages?sinceId=0  ← один эндпоинт, sinceId=0 = все ← после
+```
+
+### Таблица переименований (полная)
+
+| До | После |
+|---|---|
+| `GET /api/patients?q=...` (было `/search`) | `GET /api/patients?q=&status=` |
+| `PUT /api/patients/{id}/assign-doctor/{did}` | `PUT /api/patients/{id}/doctor/{did}` |
+| `PATCH /api/patients/{pid}/paid-services/{lid}/pay` | `PATCH /api/patients/{pid}/paid-services/{lid}` + body |
+| `POST /api/wards/{id}/admit/{pid}` | `PUT /api/wards/{id}/patients/{pid}` |
+| `POST /api/wards/{id}/discharge/{pid}` | `DELETE /api/wards/{id}/patients/{pid}` |
+| `GET /api/client/appointments/my` | `GET /api/client/me/appointments` |
+| `GET /api/client/service-orders/my` | `GET /api/client/me/service-orders` |
+| `GET /api/client/my-assignments` | `GET /api/client/me/assignments` |
+| `GET /api/chat/my-rooms` | `GET /api/chat/me/rooms` |
+| `GET /api/chat/rooms/{id}/messages/poll?sinceId=N` | `GET /api/chat/rooms/{id}/messages?sinceId=N` |
+| `GET /api/medical/documents/my` | `GET /api/medical/me/documents` |
+| `GET /api/medical/history/my` | `GET /api/medical/me/history` |
+| `PATCH /api/nurse/supplies/{id}/adjust` | `PATCH /api/nurse/supplies/{id}` + body |
+| `PATCH /api/nurse/assignments/{id}/status?status=X` | `PATCH /api/nurse/assignments/{id}` + body |

@@ -207,9 +207,11 @@ class PaidServiceIntegrationTest extends AbstractIntegrationTest {
         // linkId — идентификатор записи PatientPaidService (связки пациент↔услуга)
         Long linkId = objectMapper.readTree(assignBody).get("id").asLong();
 
-        // PATCH /api/patients/{patientId}/paid-services/{linkId}/pay — отмечаем оплаченной.
-        // PATCH (не PUT) — частичное обновление: меняем только поле paid, не всю запись.
-        mockMvc.perform(patch("/api/patients/" + patientId + "/paid-services/" + linkId + "/pay"))
+        // PATCH /api/patients/{patientId}/paid-services/{linkId} — отмечаем оплаченной.
+        // PATCH (не PUT) — частичное обновление ресурса назначения: меняем только поле paid.
+        mockMvc.perform(patch("/api/patients/" + patientId + "/paid-services/" + linkId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"paid\": true}"))
                 .andExpect(status().isOk())
                 // paid переключился с false на true
                 .andExpect(jsonPath("$.paid").value(true));
