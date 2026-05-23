@@ -11,11 +11,14 @@ import com.hospital.exception.ResourceNotFoundException;
 import com.hospital.mapper.PaidServiceMapper;
 import com.hospital.mapper.PatientMapper;
 import com.hospital.repository.*;
+import com.hospital.search.PatientDocument;
+import com.hospital.search.SearchService;
 import com.hospital.service.PatientService;
 import com.hospital.service.event.EventPublisher;
 import com.hospital.service.event.PatientEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -93,6 +96,10 @@ public class PatientServiceImpl implements PatientService {
      */
     private final EventPublisher eventPublisher;
 
+    // Optional: null when opensearch.enabled=false (test profile)
+    @Autowired(required = false)
+    private SearchService searchService;
+
     /**
      * Создание нового пациента в системе.
      *
@@ -142,9 +149,7 @@ public class PatientServiceImpl implements PatientService {
 
         Patient saved = patientRepository.save(patient);
         log.info("Created patient id={}", saved.getId());
-
-        // Возвращаем DTO (не сущность!), чтобы не раскрывать внутренние детали сущности
-        // на уровне API. PatientResponse содержит только те поля, которые нужны клиенту.
+        indexPatient(saved);
         return patientMapper.toResponse(saved);
     }
 
@@ -219,7 +224,9 @@ public class PatientServiceImpl implements PatientService {
         // отследит изменения и выполнит UPDATE при коммите транзакции.
         // Явный вызов save() здесь — хорошая практика для явности намерений.
         patientMapper.updateFromRequest(patient, request);
-        return patientMapper.toResponse(patientRepository.save(patient));
+        Patient saved = patientRepository.save(patient);
+        indexPatient(saved);
+        return patientMapper.toResponse(saved);
     }
 
     /**
@@ -241,6 +248,7 @@ public class PatientServiceImpl implements PatientService {
         // Теперь этот пациент "невидим" для всех бизнес-операций.
         patient.setActive(false);
         patientRepository.save(patient);
+        if (searchService != null) searchService.deletePatient(String.valueOf(id));
         log.info("Soft-deleted patient id={}", id);
     }
 
@@ -415,12 +423,24 @@ public class PatientServiceImpl implements PatientService {
      */
     private <T> PageResponse<T> toPageResponse(Page<T> page) {
         return PageResponse.<T>builder()
-                .content(page.getContent())           // данные текущей страницы
-                .page(page.getNumber())               // номер текущей страницы (0-based)
-                .size(page.getSize())                 // размер страницы
-                .totalElements(page.getTotalElements()) // общее количество элементов
-                .totalPages(page.getTotalPages())     // общее количество страниц
-                .last(page.isLast())                  // это последняя страница?
+                .content(page.getContent())
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .last(page.isLast())
                 .build();
+    }
+
+    private void indexPatient(Patient patient) {
+        if (searchService == null) return;
+        searchService.indexPatient(PatientDocument.builder()
+                .id(String.valueOf(patient.getId()))
+                .fullName(patient.getFullName())
+                .ward(patient.getCurrentWard() != null ? patient.getCurrentWard().getWardNumber() : null)
+                .department(patient.getCurrentDoctor() != null && patient.getCurrentDoctor().getDepartment() != null
+                        ? patient.getCurrentDoctor().getDepartment().getName() : null)
+                .active(patient.isActive())
+                .build());
     }
 }

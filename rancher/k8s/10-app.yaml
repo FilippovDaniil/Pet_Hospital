@@ -54,6 +54,9 @@ data:
   # logback-spring.xml читает это значение: ${LOKI_URL:http://localhost:3100}
   LOKI_URL: "http://loki:3100"
 
+  # OpenSearch URL (12-opensearch.yaml, ClusterIP DNS)
+  OPENSEARCH_URL: "http://opensearch:9200"
+
   # Отключаем mail health indicator (без SMTP → HealthIndicator=DOWN → 503)
   # При 503 readinessProbe постоянно падает → Pod бесконечно перезапускается
   MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
@@ -112,7 +115,13 @@ spec:
             - sh
             - -c
             - until nc -z loki 3100; do sleep 2; done
-          # loki4j appender попытается отправить логи при старте приложения
+
+        - name: wait-for-opensearch
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z opensearch 9200; do sleep 2; done
 
       containers:
         - name: hospital-app

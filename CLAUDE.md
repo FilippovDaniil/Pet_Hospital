@@ -1,6 +1,6 @@
 # Pet Hospital HIS — Claude Code Guide
 
-Учебный проект: Hospital Information System на Spring Boot 3.2 с клиентским порталом, чат-системой и медицинской документацией.
+Учебный проект: Hospital Information System на Spring Boot 3.2 с клиентским порталом, чат-системой, медицинской документацией и полнотекстовым поиском через OpenSearch.
 
 ---
 
@@ -8,7 +8,7 @@
 ## Быстрый запуск
 
 ```bash
-docker-compose up -d          # поднять все 8 сервисов
+docker-compose up -d          # поднять все 9 сервисов (включая OpenSearch)
 docker-compose up -d --build app  # пересобрать после изменения кода
 ```
 
@@ -32,8 +32,9 @@ rancher/k8s/
 ├── 07-loki.yaml        # ConfigMap + PVC 2Gi + securityContext(root) + ClusterIP
 ├── 08-prometheus.yaml  # ConfigMap + PVC 1Gi + NodePort :30900
 ├── 09-grafana.yaml     # 3×ConfigMap + PVC 256Mi + NodePort :30300
-├── 10-app.yaml         # 4×initContainer + imagePullPolicy:Never + NodePort :30090
-└── 11-dashboard.yaml   # K8s Dashboard в namespace kubernetes-dashboard + NodePort :30443
+├── 10-app.yaml         # 5×initContainer + imagePullPolicy:Never + NodePort :30090
+├── 11-dashboard.yaml   # K8s Dashboard в namespace kubernetes-dashboard + NodePort :30443
+└── 12-opensearch.yaml  # PVC 2Gi + sysctl initContainer + Deployment + ClusterIP :9200
 ```
 
 ### Порты сервисов (K8s NodePort)
@@ -45,6 +46,7 @@ rancher/k8s/
 | Prometheus | http://localhost:30901 | — |
 | Grafana | http://localhost:30301 | admin / admin |
 | K8s Dashboard | https://localhost:30443 | Bearer token |
+| OpenSearch REST | http://localhost:9200 (port-forward) | — |
 
 ### Имена K8s Services (DNS внутри кластера)
 
@@ -58,6 +60,7 @@ rancher/k8s/
 | `loki` | `LOKI_URL=http://loki:3100` | 07-loki.yaml |
 | `prometheus` | `http://prometheus:9090` (Grafana datasource) | 08-prometheus.yaml |
 | `hospital-app` | `targets: hospital-app:8090` (Prometheus scrape) | 10-app.yaml |
+| `opensearch` | `OPENSEARCH_URL=http://opensearch:9200` | 12-opensearch.yaml |
 
 ### Деплой (первый раз)
 
@@ -91,8 +94,8 @@ kubectl get pods -n pet-hospital -w
 - `PLAINTEXT://kafka:29092` — для подов внутри K8s (K8s DNS-имя)
 - `PLAINTEXT_HOST://localhost:9092` — для port-forward с хоста
 
-**4 initContainer в 10-app.yaml** — Spring Boot падает при старте если БД, Redis,
-Kafka или Loki недоступны. initContainer ждёт каждую зависимость (nc -z host port)
+**5 initContainer в 10-app.yaml** — Spring Boot падает при старте если БД, Redis,
+Kafka, Loki или OpenSearch недоступны. initContainer ждёт каждую зависимость (nc -z host port)
 перед запуском основного контейнера.
 
 **`@KafkaListener` vs `KafkaTemplate`** — `KafkaTemplate` (producer) подключается LAZY, при первой отправке → initContainer `wait-for-kafka` НЕ нужен. `@KafkaListener` (consumer) подключается EAGERLY при старте Spring Boot → без Kafka = CrashLoopBackOff → initContainer ОБЯЗАТЕЛЕН. Проект использует оба → initContainer нужен.
@@ -145,6 +148,7 @@ src/main/java/com/hospital/
 │   ├── JwtAuthenticationFilter.java
 │   ├── KafkaConfig.java                # топики Kafka + @Primary JpaTransactionManager
 │   ├── CacheConfig.java                # Redis TTL=5мин
+│   ├── OpenSearchConfig.java           # @ConditionalOnProperty + ApacheHttpClient5TransportBuilder
 │   ├── AopLoggingAspect.java           # логирование времени всех сервисов
 │   └── DataInitializer.java            # создание 10 дефолтных пользователей + linkDoctorUser()
 │
@@ -158,7 +162,8 @@ src/main/java/com/hospital/
 │   ├── PaidServiceController.java      # /api/paid-services
 │   ├── AdminController.java            # /api/admin (ROLE_ADMIN only)
 │   ├── ChatController.java             # /api/chat/** — чаты поддержки и врача
-│   └── MedicalController.java          # /api/medical/** — документы и история
+│   ├── MedicalController.java          # /api/medical/** — документы и история
+│   └── SearchController.java           # /api/search/patients, /api/search/doctors
 │
 ├── service/
 │   ├── ChatService.java                # интерфейс: getOrCreate, send, poll, rooms
@@ -172,6 +177,12 @@ src/main/java/com/hospital/
 │   │   └── MedicalServiceImpl.java     # @Transactional(readOnly) + override на write
 │   ├── event/                          # Kafka события + консьюмеры
 │   └── strategy/                       # Strategy pattern для выписки пациентов
+│
+├── search/
+│   ├── SearchService.java              # интерфейс: index/delete/search для Patient и Doctor
+│   ├── SearchServiceImpl.java          # @Autowired(required=false) client + graceful null-check
+│   ├── PatientDocument.java            # Lombok @Data @Builder: id, fullName, ward, department, active
+│   └── DoctorDocument.java             # Lombok @Data @Builder: id, fullName, specialization, department, active
 │
 ├── entity/
 │   ├── ChatRoomType.java               # enum: SUPPORT, DOCTOR_CLIENT
@@ -258,6 +269,7 @@ src/main/resources/
 | Kafdrop | 9000 |
 | Loki | 3100 |
 | Grafana | 3000 |
+| OpenSearch | 9200 |
 
 ---
 
@@ -294,6 +306,13 @@ GET  /api/medical/documents/patient/{id}     → ROLE_DOCTOR
 GET  /api/medical/history/patient/{id}       → ROLE_DOCTOR
 GET  /api/medical/documents/my               → ROLE_CLIENT
 GET  /api/medical/history/my                 → ROLE_CLIENT
+```
+
+### Поиск — SecurityConfig правила
+
+```
+GET /api/search/patients   → ROLE_ADMIN, ROLE_DOCTOR, ROLE_NURSE
+GET /api/search/doctors    → ROLE_ADMIN, ROLE_DOCTOR, ROLE_NURSE
 ```
 
 ---
@@ -394,6 +413,47 @@ jdbcTemplate.update(
 
 Используется в doctor.html: вкладка «Чат» проверяет `patient.clientUserId != null`. Кнопка «+ В пациенты» в секции «Приёмы» передаёт `clientUserId` при регистрации.
 
+### OpenSearch: @ConditionalOnProperty + @Autowired(required=false)
+
+`OpenSearchConfig` создаёт бин `OpenSearchClient` только при `opensearch.enabled=true` (matchIfMissing=true).
+Тестовый профиль устанавливает `opensearch.enabled=false` → бин не создаётся → `@Autowired(required=false)` в `SearchServiceImpl` получает `null`.
+
+Все методы `SearchServiceImpl` начинаются с `if (client == null) return;` — graceful no-op.
+Это позволяет всем 241 существующим тестам работать без изменений.
+
+### OpenSearch K8s: vm.max_map_count
+
+OpenSearch (как и Elasticsearch) требует `vm.max_map_count >= 262144`. В K8s устанавливается
+через привилегированный initContainer в `12-opensearch.yaml`:
+```yaml
+initContainers:
+  - name: sysctl
+    image: busybox:1.36
+    securityContext:
+      privileged: true
+    command: ["sysctl", "-w", "vm.max_map_count=262144"]
+```
+Без этого OpenSearch падает с ошибкой bootstrap checks failed.
+
+### OpenSearch: DISABLE_SECURITY_PLUGIN=true
+
+В dev/Docker/K8s окружениях TLS и basic auth отключены через env:
+```
+DISABLE_SECURITY_PLUGIN=true
+```
+Это позволяет подключаться по plain HTTP без сертификатов.
+
+### OpenSearch: ApacheHttpClient5TransportBuilder
+
+opensearch-java 2.x использует `ApacheHttpClient5TransportBuilder` (NOT legacy `RestClientTransport`).
+Артефакт `httpclient5` нужен явно — Spring Boot не управляет его версией.
+```java
+OpenSearchTransport transport = ApacheHttpClient5TransportBuilder
+        .builder(httpHost)
+        .setMapper(new JacksonJsonpMapper())
+        .build();
+```
+
 ### Java 17 vs Java 21
 
 Проект компилируется под Java 17. Методы Java 21+ запрещены:
@@ -425,16 +485,16 @@ jdbcTemplate.update(
 "C:\Program Files\JetBrains\IntelliJ IDEA 2025.2.4\plugins\maven\lib\maven3\bin\mvn.cmd" test
 
 # Только юнит-тесты (без Docker):
-mvn test -Dtest="PatientServiceTest,WardServiceTest,AdminServiceTest,JwtUtilTest,ChatServiceTest,MedicalServiceTest"
+mvn test -Dtest="PatientServiceTest,WardServiceTest,AdminServiceTest,JwtUtilTest,ChatServiceTest,MedicalServiceTest,SearchServiceTest"
 
 # Только интеграционные (нужен Docker TCP 2375):
-mvn test -Dtest="AuthIntegrationTest,PatientIntegrationTest,ChatIntegrationTest,MedicalIntegrationTest"
+mvn test -Dtest="AuthIntegrationTest,PatientIntegrationTest,ChatIntegrationTest,MedicalIntegrationTest,SearchIntegrationTest"
 
 # Все тесты:
 mvn test
 ```
 
-**Итого: 213 теста — 80 юнит + 67 интеграционных + 66 из предыдущих сессий**
+**Итого: 247 тестов — 86 юнит + 70 интеграционных + 91 из предыдущих сессий**
 
 **Windows**: Docker Desktop → Settings → General → "Expose daemon on tcp://localhost:2375 without TLS"
 
@@ -455,10 +515,12 @@ mvn test
 | `WardServiceTest` | Юнит | 5 | Размещение в палате |
 | `ChatServiceTest` | Юнит | 24 | Все методы ChatServiceImpl, IDOR, двунаправленный чат |
 | `MedicalServiceTest` | Юнит | 21 | Все методы MedicalServiceImpl, типы/labels |
+| `SearchServiceTest` | Юнит | 6 | Graceful no-op когда OpenSearchClient=null |
 | `AuthIntegrationTest` | Интеграционный | 10 | Логин, регистрация, 401/403 |
 | `PatientIntegrationTest` | Интеграционный | 10 | CRUD пациентов через HTTP, clientUserId, авто-чат |
 | `ChatIntegrationTest` | Интеграционный | 17 | RBAC чата, идемпотентность, send+poll, двунаправленный чат |
 | `MedicalIntegrationTest` | Интеграционный | 23 | RBAC медицины, создание, e2e |
+| `SearchIntegrationTest` | Интеграционный | 3 | Реальный OpenSearch через Testcontainers, index+search+delete |
 
 ### Особенности тестирования на Windows
 

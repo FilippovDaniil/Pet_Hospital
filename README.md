@@ -39,6 +39,7 @@
 30. [Медицинская документация](#30-медицинская-документация)
 31. [Портал врача](#31-портал-врача)
 32. [Kubernetes: запуск в Rancher Desktop](#32-kubernetes-запуск-в-rancher-desktop)
+33. [OpenSearch — полнотекстовый поиск](#33-opensearch--полнотекстовый-поиск)
 
 ---
 
@@ -117,6 +118,8 @@
 | Loki | 2.9.0 | Хранилище и индексация логов |
 | Grafana | 10.2.3 | Визуализация логов (LogQL) |
 | loki-logback-appender | 1.5.2 | Прямая отправка логов из Spring Boot в Loki |
+| **OpenSearch** | **2.17.0** | **Полнотекстовый поиск по пациентам и врачам** |
+| opensearch-java | 2.15.0 | Java-клиент для OpenSearch (Apache HTTP 5 transport) |
 
 ### Тестирование
 
@@ -1693,7 +1696,7 @@ ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-Djava.security.egd=file:/dev/.
 
 ### docker-compose.yml
 
-Описывает **8 сервисов** — всю инфраструктуру и само приложение:
+Описывает **9 сервисов** — всю инфраструктуру и само приложение:
 
 | Сервис | Образ | Порт | Назначение |
 |---|---|---|---|
@@ -1705,6 +1708,7 @@ ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-Djava.security.egd=file:/dev/.
 | kafdrop | obsidiandynamics/kafdrop | 9000 | Web UI для Kafka |
 | **loki** | grafana/loki:2.9.0 | 3100 | Хранилище логов |
 | **grafana** | grafana/grafana:10.2.3 | 3000 | Визуализация логов |
+| **opensearch** | opensearchproject/opensearch:2.17.0 | 9200 | Полнотекстовый поиск |
 
 ### Kafka — двойные листенеры
 
@@ -1728,6 +1732,7 @@ PLAINTEXT_HOST://localhost:9092 — для подключения с хоста 
 | `SPRING_DATA_REDIS_HOST` | `redis` | `localhost` |
 | `SPRING_KAFKA_BOOTSTRAP_SERVERS` | `kafka:29092` | `localhost:9092` |
 | `LOKI_URL` | `http://loki:3100` | `http://localhost:3100` |
+| `OPENSEARCH_URL` | `http://opensearch:9200` | `http://localhost:9200` |
 
 **Kafdrop** — `http://localhost:9000`. Просмотр топиков, чтение сообщений, мониторинг групп консьюмеров.
 
@@ -1763,7 +1768,7 @@ src/test/java/com/hospital/
     +-- JwtUtilTest.java                  # 5 тестов генерации и валидации JWT
 ```
 
-**Итого: 193 теста — все проходят.**
+**Итого: 247 тестов — все проходят.**
 
 | Класс | Тип | Тестов | Что проверяет |
 |---|---|---|---|
@@ -2989,3 +2994,161 @@ Redis, Kafka и Loki. initContainer блокирует старт основно
 **Kafka dual listeners** (05-kafka.yaml):
 - `PLAINTEXT://kafka:29092` — для подов K8s (K8s DNS-имя)
 - `PLAINTEXT_HOST://localhost:9092` — для port-forward с хоста
+
+---
+
+## 33. OpenSearch — полнотекстовый поиск
+
+### Зачем OpenSearch в этом проекте
+
+OpenSearch добавляет **full-text поиск** поверх основной PostgreSQL-базы. Реляционные `LIKE '%query%'` медленно работают на больших объёмах и не умеют нечёткое сопоставление, ранжирование по релевантности и поиск по нескольким полям одновременно.
+
+OpenSearch решает эти задачи:
+- Поиск пациента по части имени, диагнозу, палате, отделению
+- Поиск врача по имени, специализации, отделению
+- Ранжирование результатов по релевантности (поле `fullName` имеет boost x3)
+
+### Архитектура интеграции
+
+```
+POST /api/patients → PatientServiceImpl.create()
+                          ↓
+                    patientRepository.save()   ← PostgreSQL (источник истины)
+                          ↓
+                    searchService.indexPatient()  ← OpenSearch (поисковый индекс)
+
+GET /api/search/patients?q=Иванов → SearchServiceImpl.searchPatients()
+                                          ↓
+                                    OpenSearch multi-match query
+                                          ↓
+                                    List<PatientDocument>
+```
+
+PostgreSQL остаётся **единственным источником истины**. OpenSearch — вторичный индекс для поиска.
+
+### Новые файлы
+
+```
+src/main/java/com/hospital/
++-- config/
+|   +-- OpenSearchConfig.java       # бин OpenSearchClient (@ConditionalOnProperty)
+|
++-- search/
+|   +-- PatientDocument.java        # документ OpenSearch для пациента
+|   +-- DoctorDocument.java         # документ OpenSearch для врача
+|   +-- SearchService.java          # интерфейс: index, delete, search
+|   +-- SearchServiceImpl.java      # реализация (@PostConstruct создаёт индексы)
+|
++-- controller/
+    +-- SearchController.java       # GET /api/search/patients, /api/search/doctors
+```
+
+### REST API поиска
+
+| Метод | URL | Доступ | Описание |
+|---|---|---|---|
+| GET | `/api/search/patients?q={query}` | ADMIN, DOCTOR, NURSE | Поиск пациентов |
+| GET | `/api/search/doctors?q={query}` | ADMIN, DOCTOR, NURSE | Поиск врачей |
+
+**Пример:**
+```bash
+# Поиск пациентов
+curl -H "Authorization: Bearer <token>" \
+     "http://localhost:8090/api/search/patients?q=Иванов"
+
+# Поиск врачей
+curl -H "Authorization: Bearer <token>" \
+     "http://localhost:8090/api/search/doctors?q=кардио"
+```
+
+**Ответ:**
+```json
+[
+  {
+    "id": "42",
+    "fullName": "Иванов Сергей Петрович",
+    "ward": "101",
+    "department": "Кардиология",
+    "active": true
+  }
+]
+```
+
+### Конфигурация
+
+```yaml
+# application.yml
+opensearch:
+  enabled: true
+  url: ${OPENSEARCH_URL:http://localhost:9200}
+
+# application-test.yml
+opensearch:
+  enabled: false   # OpenSearch отключён в тестах — graceful no-op
+```
+
+`@ConditionalOnProperty(name = "opensearch.enabled", havingValue = "true", matchIfMissing = true)` на `OpenSearchConfig` — бин `OpenSearchClient` не создаётся при `enabled=false`. `SearchServiceImpl` инжектирует `@Autowired(required = false) OpenSearchClient` — если null, все операции — no-op. Это позволяет всем существующим тестам работать без изменений.
+
+### Индексирование
+
+Индексирование происходит автоматически при каждом создании и обновлении сущностей:
+
+| Метод | Когда индексируется |
+|---|---|
+| `PatientServiceImpl.create()` | При создании нового пациента |
+| `PatientServiceImpl.update()` | При обновлении пациента |
+| `PatientServiceImpl.softDelete()` | Удаление из индекса |
+| `DoctorServiceImpl.create()` | При создании врача |
+| `DoctorServiceImpl.update()` | При обновлении врача |
+| `DoctorServiceImpl.softDelete()` | Удаление из индекса |
+
+> **Важно**: существующие данные (загруженные Flyway-миграциями) не переиндексируются автоматически. Для начальной индексации существующих данных можно добавить `@PostConstruct` в `DataInitializer` или реализовать эндпоинт `/api/admin/reindex`.
+
+### Индексы OpenSearch
+
+| Индекс | Поля | Boost |
+|---|---|---|
+| `patients` | id, fullName, ward, department, active | fullName x3 |
+| `doctors` | id, fullName, specialization, department, active | fullName x3 |
+
+Оба индекса создаются при старте приложения через `@PostConstruct ensureIndexes()`.
+
+### Docker
+
+```yaml
+# docker-compose.yml
+opensearch:
+  image: opensearchproject/opensearch:2.17.0
+  environment:
+    - discovery.type=single-node
+    - DISABLE_SECURITY_PLUGIN=true   # без SSL — для dev
+    - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+  ports:
+    - "9200:9200"
+  healthcheck:
+    test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+```
+
+`DISABLE_SECURITY_PLUGIN=true` — отключает TLS и Basic Auth для простоты dev-окружения. В production использовать с включённой security и выданными сертификатами.
+
+### Kubernetes (Rancher Desktop)
+
+Манифест: `rancher/k8s/12-opensearch.yaml`
+
+Включает:
+- `PersistentVolumeClaim` 2Gi для данных индексов
+- `Deployment` с initContainer `sysctl -w vm.max_map_count=262144` (требование Lucene)
+- `ClusterIP Service` на порту 9200 (DNS: `opensearch:9200`)
+
+В `10-app.yaml` добавлены:
+- `OPENSEARCH_URL: "http://opensearch:9200"` в ConfigMap
+- initContainer `wait-for-opensearch` (nc -z opensearch 9200)
+
+### Тесты
+
+| Класс | Тип | Тестов | Что проверяет |
+|---|---|---|---|
+| `SearchServiceTest` | Unit | 6 | no-op режим при client=null (тесты без OpenSearch) |
+| `SearchIntegrationTest` | Integration (TC) | 3 | Реальная индексация и поиск через Testcontainers |
+
+`SearchIntegrationTest` использует `GenericContainer` с `opensearchproject/opensearch:2.17.0` и `@DynamicPropertySource` для подстановки порта. Профиль `test` не используется — чтобы не отключался OpenSearch (свойства передаются inline через `properties = {...}`).

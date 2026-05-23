@@ -119,7 +119,22 @@
       "Bash(kubectl describe *)",
       "Bash(kubectl rollout status *)",
       "Bash(kubectl exec *)",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('role:', d.get\\('role'\\), '| token:', d.get\\('token',''\\)[:30]+'...'\\)\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('role:', d.get\\('role'\\), '| token:', d.get\\('token',''\\)[:30]+'...'\\)\")",
+      "Bash(\"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\" compile -q -f \"C:\\\\Users\\\\MaxxPC\\\\IdeaProjects\\\\Pet_Hospital\\\\pom.xml\")",
+      "Bash(docker compose *)",
+      "Bash(kubectl apply *)",
+      "Bash(\"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\" test-compile -q -f \"C:\\\\Users\\\\MaxxPC\\\\IdeaProjects\\\\Pet_Hospital\\\\pom.xml\")",
+      "Bash(\"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\" test -f \"C:\\\\Users\\\\MaxxPC\\\\IdeaProjects\\\\Pet_Hospital\\\\pom.xml\")",
+      "Bash(\"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\" package -DskipTests -q -f \"C:\\\\Users\\\\MaxxPC\\\\IdeaProjects\\\\Pet_Hospital\\\\pom.xml\")",
+      "Bash(docker rm *)",
+      "Bash(Start-Sleep -Seconds 30)",
+      "Bash(Invoke-WebRequest -Uri http://localhost:8090/actuator/health -UseBasicParsing)",
+      "Bash(Select-Object -ExpandProperty Content)",
+      "PowerShell(docker build *)",
+      "PowerShell(docker save pet-hospital:1.0.0 -o \"$env:TEMP\\\\pet-hospital.tar\"; Write-Host \"Exit: $LASTEXITCODE\")",
+      "PowerShell(rdctl shell -- sh -c \"docker load < /mnt/c/Users/$env:USERNAME/AppData/Local/Temp/pet-hospital.tar\" 2>&1 | Select-Object -Last 5; Write-Host \"Exit: $LASTEXITCODE\")",
+      "PowerShell(kubectl rollout status *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('status:', d['status']\\)\")"
     ]
   }
 }

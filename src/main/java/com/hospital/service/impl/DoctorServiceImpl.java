@@ -16,11 +16,14 @@ import com.hospital.repository.AppointmentRepository;
 import com.hospital.repository.DepartmentRepository;
 import com.hospital.repository.DoctorRepository;
 import com.hospital.repository.PatientRepository;
+import com.hospital.search.DoctorDocument;
+import com.hospital.search.SearchService;
 import com.hospital.service.DoctorService;
 import com.hospital.service.event.DoctorEvent;
 import com.hospital.service.event.EventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -60,6 +63,10 @@ public class DoctorServiceImpl implements DoctorService {
     private final PatientMapper patientMapper;
     private final EventPublisher eventPublisher;
 
+    // Optional: null when opensearch.enabled=false (test profile)
+    @Autowired(required = false)
+    private SearchService searchService;
+
     /**
      * Создание нового врача.
      *
@@ -97,6 +104,7 @@ public class DoctorServiceImpl implements DoctorService {
                 .departmentId(saved.getDepartment() != null ? saved.getDepartment().getId() : null)
                 .build());
         log.info("Created doctor id={}", saved.getId());
+        indexDoctor(saved);
         return doctorMapper.toResponse(saved);
     }
 
@@ -143,7 +151,9 @@ public class DoctorServiceImpl implements DoctorService {
                     .orElseThrow(() -> new ResourceNotFoundException("Department", request.getDepartmentId()));
             doctor.setDepartment(dept);
         }
-        return doctorMapper.toResponse(doctorRepository.save(doctor));
+        Doctor saved = doctorRepository.save(doctor);
+        indexDoctor(saved);
+        return doctorMapper.toResponse(saved);
     }
 
     /**
@@ -156,8 +166,9 @@ public class DoctorServiceImpl implements DoctorService {
     @Transactional
     public void softDelete(Long id) {
         Doctor doctor = findActiveById(id);
-        doctor.setActive(false); // "невидимый" для бизнес-операций, но остаётся в истории
+        doctor.setActive(false);
         doctorRepository.save(doctor);
+        if (searchService != null) searchService.deleteDoctor(String.valueOf(id));
         log.info("Soft-deleted doctor id={}", id);
     }
 
@@ -235,12 +246,23 @@ public class DoctorServiceImpl implements DoctorService {
      */
     private <T> PageResponse<T> toPageResponse(Page<T> page) {
         return PageResponse.<T>builder()
-                .content(page.getContent())           // данные страницы
-                .page(page.getNumber())               // текущая страница (0-based)
-                .size(page.getSize())                 // размер страницы
-                .totalElements(page.getTotalElements()) // итого записей
-                .totalPages(page.getTotalPages())     // итого страниц
-                .last(page.isLast())                  // это последняя страница?
+                .content(page.getContent())
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .last(page.isLast())
                 .build();
+    }
+
+    private void indexDoctor(Doctor doctor) {
+        if (searchService == null) return;
+        searchService.indexDoctor(DoctorDocument.builder()
+                .id(String.valueOf(doctor.getId()))
+                .fullName(doctor.getFullName())
+                .specialization(doctor.getSpecialty() != null ? doctor.getSpecialty().name() : null)
+                .department(doctor.getDepartment() != null ? doctor.getDepartment().getName() : null)
+                .active(doctor.isActive())
+                .build());
     }
 }

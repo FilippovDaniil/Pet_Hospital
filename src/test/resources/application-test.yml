@@ -39,6 +39,9 @@ spring:
     listener:
       ack-mode: manual_immediate
 
+opensearch:
+  enabled: false
+
 logging:
   level:
     com.hospital: DEBUG

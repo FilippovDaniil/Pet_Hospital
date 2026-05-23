@@ -96,6 +96,10 @@ jwt:
   secret: "pet-hospital-his-jwt-secret-key-for-hs256-authentication-2024"
   expiration-ms: 86400000
 
+opensearch:
+  enabled: true
+  url: ${OPENSEARCH_URL:http://localhost:9200}
+
 logging:
   level:
     com.hospital: DEBUG

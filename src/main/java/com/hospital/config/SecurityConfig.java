@@ -175,6 +175,9 @@ public class SecurityConfig {
                 .requestMatchers(org.springframework.http.HttpMethod.GET,
                         "/api/medical/documents/my", "/api/medical/history/my").hasRole("CLIENT")
 
+                // Полнотекстовый поиск через OpenSearch
+                .requestMatchers("/api/search/**").hasAnyRole("ADMIN", "DOCTOR", "NURSE")
+
                 // Модуль медсестры: склад и назначения
                 .requestMatchers("/api/nurse/**").hasRole("NURSE")
 
