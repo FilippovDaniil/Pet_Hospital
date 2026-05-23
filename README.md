@@ -2888,27 +2888,15 @@ rancher/k8s/
 > **Почему нельзя просто `docker build`?**
 > Rancher Desktop запускает k3s в отдельной Linux VM через WSL2. `docker build` кладёт
 > образ в хранилище Docker Desktop, а k3s имеет своё отдельное хранилище. Образ нужно
-> загрузить именно в VM через `rdctl shell`.
+> загрузить именно в VM через `rdctl shell` (`--provenance=false` обязателен — без него
+> BuildKit создаёт manifest list, который k3s не находит с `imagePullPolicy: Never`).
 
 ```powershell
-# Флаг --provenance=false обязателен!
-# Без него BuildKit создаёт manifest list → k3s не найдёт образ с imagePullPolicy: Never
-docker build --provenance=false -t pet-hospital:1.0.0 .
+# Один скрипт вместо трёх команд
+.\rancher\build-and-load.ps1
 ```
 
-```powershell
-docker save pet-hospital:1.0.0 -o $env:TEMP\pet-hospital.tar
-```
-
-```powershell
-# /mnt/c/ = диск C:\ видимый из Linux VM
-rdctl shell -- sh -c "docker load < /mnt/c/Users/$env:USERNAME/AppData/Local/Temp/pet-hospital.tar"
-```
-
-```powershell
-# Проверить
-rdctl shell -- sh -c "docker images pet-hospital"
-```
+Скрипт делает три шага: `docker build --provenance=false` → `docker save` → `rdctl shell -- docker load`.
 
 ### Шаг 2: Деплой
 
@@ -2967,10 +2955,8 @@ kubectl port-forward -n pet-hospital service/postgres 5432:5432
 ### Обновление приложения
 
 ```powershell
-docker build --provenance=false -t pet-hospital:1.0.0 .
-docker save pet-hospital:1.0.0 -o $env:TEMP\pet-hospital.tar
-rdctl shell -- sh -c "docker load < /mnt/c/Users/$env:USERNAME/AppData/Local/Temp/pet-hospital.tar"
-kubectl rollout restart deployment/hospital-app -n pet-hospital
+# Сборка + загрузка + рестарт одной командой
+.\rancher\build-and-load.ps1 -Restart
 ```
 
 ### Полный сброс
@@ -2990,6 +2976,8 @@ kubectl apply -f rancher/k8s/           # поднять заново
 
 **4 initContainers** (10-app.yaml) — Spring Boot с Flyway не запустится без PostgreSQL,
 Redis, Kafka и Loki. initContainer блокирует старт основного контейнера пока зависимость недоступна.
+
+> **Почему нужен `wait-for-kafka`?** `KafkaTemplate` (producer) подключается лениво — при первой отправке, т.е. initContainer для него не обязателен. Но `@KafkaListener` (consumer) подключается **сразу при старте** Spring Boot — без Kafka приложение падает в CrashLoopBackOff. В этом проекте есть три `@KafkaListener` (`PatientEventConsumer`, `AdmissionEventConsumer`, `PaidServiceEventConsumer`) → initContainer обязателен.
 
 **`livenessProbe.initialDelaySeconds: 90`** — больше чем у readinessProbe (30).
 Если liveness сработает до того как Spring Boot успел запуститься, K8s убьёт Pod → CrashLoopBackOff.

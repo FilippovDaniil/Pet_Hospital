@@ -59,13 +59,11 @@ rancher/k8s/
 | `prometheus` | `http://prometheus:9090` (Grafana datasource) | 08-prometheus.yaml |
 | `hospital-app` | `targets: hospital-app:8090` (Prometheus scrape) | 10-app.yaml |
 
-### Деплой (три шага)
+### Деплой (первый раз)
 
 ```powershell
 # 1. Собрать образ и загрузить в VM Rancher Desktop
-docker build --provenance=false -t pet-hospital:1.0.0 .
-docker save pet-hospital:1.0.0 -o $env:TEMP\pet-hospital.tar
-rdctl shell -- sh -c "docker load < /mnt/c/Users/$env:USERNAME/AppData/Local/Temp/pet-hospital.tar"
+.\rancher\build-and-load.ps1
 ```
 ```powershell
 # 2. Задеплоить весь стек
@@ -97,6 +95,8 @@ kubectl get pods -n pet-hospital -w
 Kafka или Loki недоступны. initContainer ждёт каждую зависимость (nc -z host port)
 перед запуском основного контейнера.
 
+**`@KafkaListener` vs `KafkaTemplate`** — `KafkaTemplate` (producer) подключается LAZY, при первой отправке → initContainer `wait-for-kafka` НЕ нужен. `@KafkaListener` (consumer) подключается EAGERLY при старте Spring Boot → без Kafka = CrashLoopBackOff → initContainer ОБЯЗАТЕЛЕН. Проект использует оба → initContainer нужен.
+
 **livenessProbe.initialDelaySeconds: 90** — БОЛЬШЕ чем у readinessProbe (30).
 Если liveness сработает раньше чем Spring Boot запустится, K8s убьёт Pod → цикл.
 
@@ -109,10 +109,8 @@ Kafka или Loki недоступны. initContainer ждёт каждую за
 ### Обновление приложения
 
 ```powershell
-docker build --provenance=false -t pet-hospital:1.0.0 .
-docker save pet-hospital:1.0.0 -o $env:TEMP\pet-hospital.tar
-rdctl shell -- sh -c "docker load < /mnt/c/Users/$env:USERNAME/AppData/Local/Temp/pet-hospital.tar"
-kubectl rollout restart deployment/hospital-app -n pet-hospital
+# Сборка + загрузка + рестарт одной командой
+.\rancher\build-and-load.ps1 -Restart
 ```
 
 ### Сброс стека

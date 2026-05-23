@@ -508,6 +508,253 @@ helm uninstall marketplace
 
 ---
 
+## Promtail в Kubernetes (k3s / Rancher Desktop)
+
+k3s пишет логи контейнеров в **CRI-формате**, а не в Docker JSON:
+```
+2024-01-01T10:00:00Z stdout F {"level":"INFO","service":"booking-service","message":"..."}
+```
+
+Поэтому pipeline stage в Promtail конфиге должен быть `cri: {}`, а не `docker: {}`:
+
+```yaml
+pipeline_stages:
+  - cri: {}       # парсит CRI-формат k3s; docker: {} работает только с docker-compose
+  - json:
+      expressions:
+        level: level
+        service: service
+  - labels:
+      level:
+      service:
+```
+
+Glob-паттерн для логов конкретного namespace (например pet-hotel):
+```yaml
+__path__: /var/log/pods/pet-hotel_*/*/*.log
+```
+
+### DaemonSet для Promtail
+
+Promtail должен работать на каждом узле кластера. В Rancher Desktop один узел — control-plane.
+Без `tolerations` DaemonSet не получит Pod на control-plane (узел помечен taint'ом).
+
+```yaml
+kind: DaemonSet
+spec:
+  template:
+    spec:
+      tolerations:
+        # control-plane taint: node-role.kubernetes.io/control-plane = NoSchedule
+        # Rancher Desktop = single-node кластер, этот узел является control-plane
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        # master — legacy имя для control-plane в старых K8s версиях
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      securityContext:
+        runAsUser: 0        # Нужен root для чтения /var/log/pods
+        runAsGroup: 0
+      containers:
+        - name: promtail
+          securityContext:
+            privileged: true    # Доступ к Docker socket и системным файлам логов
+```
+
+---
+
+## subPath: монтирование одного файла из ConfigMap
+
+По умолчанию монтирование ConfigMap создаёт в директории **только** файлы из ConfigMap,
+удаляя всё остальное. Для `init-db.sql` нельзя заменить всю директорию `/docker-entrypoint-initdb.d/`.
+
+Решение — `subPath: <key>`: монтирует один файл, не директорию:
+
+```yaml
+volumes:
+  - name: init-script
+    configMap:
+      name: postgres-init-config   # ConfigMap с ключом init-db.sql
+
+containers:
+  - name: postgres
+    volumeMounts:
+      - name: init-script
+        # mountPath: полный путь файла в контейнере
+        mountPath: /docker-entrypoint-initdb.d/init-db.sql
+        # subPath: имя ключа в ConfigMap = только этот файл монтируется
+        # Без subPath: вся директория /docker-entrypoint-initdb.d/ заменяется
+        subPath: init-db.sql
+```
+
+**Ограничение subPath:** изменения в ConfigMap не применяются автоматически к смонтированному файлу.
+Для production использовать immutable ConfigMap + явный rollout restart.
+
+---
+
+## Spring Kafka: lazy connection
+
+Spring Boot автоматически настраивает Kafka из `spring.kafka` в classpath.
+Но **KafkaTemplate не инициализируется при старте** — соединение открывается при первой отправке.
+
+Это означает:
+- Сервис **без KafkaTemplate** (например, support-service) **стартует без Kafka**.
+- initContainer `wait-for-kafka` не нужен таким сервисам.
+- Сервисы которые **реально используют** KafkaTemplate / @KafkaListener **должны** ждать Kafka.
+
+```yaml
+# Нужен wait-for-kafka:
+#   booking-service   (publishesBookingCreatedEvent via KafkaTemplate)
+#   billing-service   (@KafkaListener booking.created)
+#   dining-service    (KafkaTemplate для order.created)
+#
+# НЕ нужен wait-for-kafka:
+#   support-service   (Kafka в зависимостях, но нет KafkaTemplate/Listener)
+#   customer-service  (только JWT, нет Kafka)
+```
+
+---
+
+## @KafkaListener vs KafkaTemplate: кто требует wait-for-kafka
+
+Два разных Kafka клиента — разное поведение при старте Spring Boot:
+
+| | KafkaTemplate (producer) | @KafkaListener (consumer) |
+|--|--|--|
+| Соединение | **Lazy** — при первой отправке | **Eager** — сразу при старте |
+| Без Kafka при старте | Стартует нормально | CrashLoopBackOff |
+| initContainer нужен? | Нет | **Да, обязательно** |
+
+```yaml
+# initContainer wait-for-kafka нужен ТОЛЬКО если есть @KafkaListener:
+initContainers:
+  - name: wait-for-kafka
+    image: busybox:1.36
+    command: ["sh", "-c", "until nc -z kafka 9092; do sleep 2; done"]
+
+# Если только KafkaTemplate (producer) — initContainer НЕ нужен.
+# Spring Kafka откроет соединение при первом вызове kafkaTemplate.send().
+```
+
+Как определить нужен ли wait-for-kafka: поищи `@KafkaListener` в коде сервиса.
+Если есть — нужен. Если только `KafkaTemplate.send()` — не нужен.
+
+---
+
+## Database-per-Service: несколько PostgreSQL в одном кластере
+
+При микросервисной архитектуре каждый сервис имеет свою БД.
+Паттерн: один YAML файл содержит N групп (PVC + Deployment + Service):
+
+```yaml
+# Для каждой БД — три ресурса:
+# PVC: postgres-auth-pvc (500Mi)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-auth-pvc
+  namespace: cinema
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 500Mi
+---
+# Deployment: postgres-auth
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-auth
+  namespace: cinema
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-auth
+  template:
+    metadata:
+      labels:
+        app: postgres-auth
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          env:
+            - name: POSTGRES_DB
+              value: auth_db     # ← уникальное имя БД
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef: { name: cinema-secrets, key: db-user }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: cinema-secrets, key: db-password }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "cinema", "-d", "auth_db"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 6
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-auth-pvc
+---
+# Service: postgres-auth (DNS имя = docker-compose container name)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-auth   # ← микросервис использует DB_HOST=postgres-auth
+  namespace: cinema
+spec:
+  selector:
+    app: postgres-auth
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP
+```
+
+Повторяй блок для каждого сервиса, меняя: `auth` → `movie`, `hall`, `order`, etc.
+
+**Ключевое правило:** Имя K8s Service (`name: postgres-auth`) должно совпадать
+с именем контейнера в docker-compose. Тогда `DB_HOST=postgres-auth` работает в обеих средах.
+
+---
+
+## Gradle multi-module: контекст сборки в Docker
+
+Gradle multi-module проект требует корень проекта как контекст сборки.
+Иначе Dockerfile не найдёт `gradlew`, `settings.gradle.kts` и другие модули.
+
+```powershell
+# Неправильно — контекст только директория сервиса:
+docker build -f auth-service/Dockerfile auth-service/
+# Ошибка: COPY gradlew . → файл не найден
+
+# Правильно — контекст = корень проекта:
+docker build --provenance=false -f auth-service/Dockerfile .
+```
+
+Исключение: фронтенд (`frontend/`) — он независим, его контекст = `frontend/`:
+```powershell
+docker build --provenance=false -f frontend/Dockerfile frontend/
+```
+
+В PowerShell скрипте это реализуется через отдельное поле `Context` в таблице образов:
+```powershell
+$Images = [ordered]@{
+    "cinema-auth-service" = @{ Dockerfile = "auth-service/Dockerfile"; Context = "." }
+    "cinema-frontend"     = @{ Dockerfile = "Dockerfile";              Context = "frontend" }
+}
+```
+
+---
+
 ## Адаптация для других проектов
 
 ### Что нужно изменить в манифестах:
