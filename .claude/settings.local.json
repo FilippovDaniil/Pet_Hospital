@@ -137,7 +137,13 @@
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('status:', d['status']\\)\")",
       "Bash(\"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\" test -Dtest=\"PatientServiceTest,WardServiceTest,AdminServiceTest,JwtUtilTest,ChatServiceTest,MedicalServiceTest,SearchServiceTest\")",
       "Bash(\"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\" test -Dtest=\"AuthIntegrationTest,PatientIntegrationTest,ChatIntegrationTest,MedicalIntegrationTest,PaidServiceIntegrationTest\")",
-      "Bash(\"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\" test -Dtest=\"SearchIntegrationTest,MedicalIntegrationTest\")"
+      "Bash(\"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\" test -Dtest=\"SearchIntegrationTest,MedicalIntegrationTest\")",
+      "PowerShell(Set-Location \"C:\\\\Users\\\\MaxxPC\\\\IdeaProjects\\\\Pet_Hospital\"; $env:DOCKER_BUILDKIT = \"0\"; .\\\\rancher\\\\build-and-load.ps1 -Restart)",
+      "PowerShell(Set-Location \"C:\\\\Users\\\\MaxxPC\\\\IdeaProjects\\\\Pet_Hospital\"; $env:DOCKER_BUILDKIT = \"1\"; .\\\\rancher\\\\build-and-load.ps1 -Restart)",
+      "Bash(\"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\" test -Dtest=\"PaymentServiceTest,PaymentControllerTest\" -pl .)",
+      "Bash(\"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\" test -Dtest=\"PaymentControllerTest\" -pl .)",
+      "Bash(\"C:\\\\Program Files\\\\JetBrains\\\\IntelliJ IDEA 2025.2.4\\\\plugins\\\\maven\\\\lib\\\\maven3\\\\bin\\\\mvn.cmd\" test -Dtest=\"JwtUtilTest,AdminServiceTest,PatientServiceTest,WardServiceTest,ChatServiceTest,MedicalServiceTest,SearchServiceTest,PaymentServiceTest,PaymentControllerTest\" -pl .)",
+      "Bash(git check-ignore *)"
     ]
   }
 }
