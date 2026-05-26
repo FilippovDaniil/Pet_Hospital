@@ -64,6 +64,13 @@ data:
   # Показывать детали здоровья для диагностики через /actuator/health
   MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: "always"
 
+  # Альфа Банк — тестовый шлюз
+  ALFABANK_GATEWAY_URL: "https://alfa.rbsuat.com/payment/rest/"
+  # returnUrl / failUrl — браузер клиента редиректится на NodePort (30090)
+  ALFABANK_RETURN_URL: "http://localhost:30090/api/payment/callback"
+  ALFABANK_FAIL_URL:   "http://localhost:30090/api/payment/fail"
+  # ALFABANK_USERNAME и ALFABANK_PASSWORD — в Secret (01-secrets.yaml), не здесь
+
 ---
 # --- РЕСУРС 2: Deployment ---
 apiVersion: apps/v1
@@ -147,6 +154,16 @@ spec:
                 secretKeyRef:
                   name: pet-hospital-secrets  # Secret из 01-secrets.yaml
                   key: postgres-password       # Ключ внутри Secret
+            - name: ALFABANK_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: pet-hospital-secrets
+                  key: alfabank-username
+            - name: ALFABANK_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pet-hospital-secrets
+                  key: alfabank-password
 
           # readinessProbe: когда Pod готов принимать HTTP-запросы?
           # /actuator/health возвращает 200 когда все компоненты UP.

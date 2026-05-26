@@ -150,6 +150,9 @@ public class SecurityConfig {
                                  "/account.html", "/doctor.html", "/admin.html", "/nurse.html",
                                  "/css/**", "/js/**", "/favicon.ico").permitAll()
 
+                // Callback от Альфа Банка — браузер редиректит без JWT-токена
+                .requestMatchers("/api/payment/callback", "/api/payment/fail").permitAll()
+
                 // Публичные GET-эндпоинты пациентского портала (просмотр без авторизации)
                 .requestMatchers(org.springframework.http.HttpMethod.GET,
                                  "/api/client/doctors", "/api/client/departments", "/api/client/services").permitAll()

@@ -100,6 +100,13 @@ opensearch:
   enabled: true
   url: ${OPENSEARCH_URL:http://localhost:9200}
 
+alfabank:
+  gateway-url: ${ALFABANK_GATEWAY_URL:https://alfa.rbsuat.com/payment/rest/}
+  user-name: ${ALFABANK_USERNAME:}
+  password: ${ALFABANK_PASSWORD:}
+  return-url: ${ALFABANK_RETURN_URL:http://localhost:8090/api/payment/callback}
+  fail-url: ${ALFABANK_FAIL_URL:http://localhost:8090/api/payment/fail}
+
 logging:
   level:
     com.hospital: DEBUG

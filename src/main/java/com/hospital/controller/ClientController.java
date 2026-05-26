@@ -7,6 +7,7 @@ import com.hospital.entity.User;
 import com.hospital.repository.UserRepository;
 import com.hospital.service.ClientService;
 import com.hospital.service.NurseService;
+import com.hospital.service.PaymentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -27,6 +28,7 @@ public class ClientController {
     private final ClientService clientService;
     private final NurseService nurseService;
     private final UserRepository userRepository;
+    private final PaymentService paymentService;
 
     @GetMapping("/doctors")
     @Operation(summary = "Список всех врачей (публичный)")
@@ -68,6 +70,15 @@ public class ClientController {
             @RequestBody @Valid ServiceOrderRequest request) {
         ServiceOrderResponse response = clientService.orderService(authentication.getName(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/service-orders/pay")
+    @Operation(summary = "Оплатить услугу через Альфа Банк — возвращает ссылку на платёжную форму (требует ROLE_CLIENT)")
+    public ResponseEntity<PaymentInitResponse> payForService(
+            Authentication authentication,
+            @RequestBody @Valid ServiceOrderRequest request) {
+        PaymentInitResponse response = paymentService.initiatePayment(authentication.getName(), request);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/me/service-orders")

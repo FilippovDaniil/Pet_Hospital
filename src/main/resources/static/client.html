@@ -498,7 +498,7 @@ select.form-control { cursor:pointer; }
 <div class="toast-container" id="toasts"></div>
 
 <script>
-const API = 'http://localhost:8090';
+const API = '';
 let token = sessionStorage.getItem('clientToken');
 let currentUser = JSON.parse(sessionStorage.getItem('clientUser') || 'null');
 let allDoctors = [];
@@ -828,19 +828,24 @@ async function doOrder(e) {
     return;
   }
   const timeVal = document.getElementById('order-time').value || null;
+  const btn = e.target.querySelector('[type="submit"]');
+  btn.disabled = true;
+  btn.textContent = 'Переход к оплате...';
   try {
-    await api('/api/client/service-orders', 'POST', {
+    const data = await api('/api/client/service-orders/pay', 'POST', {
       serviceId:     +document.getElementById('order-service-id').value,
       contactPhone:  document.getElementById('order-phone').value || null,
       notes:         document.getElementById('order-notes').value || null,
       preferredDate: dateVal,
       preferredTime: timeVal,
     });
-    closeModal('order');
-    document.getElementById('form-order').reset();
-    document.getElementById('order-time-group').style.display = 'none';
-    toast('Заказ оформлен! Мы свяжемся с вами.', 'success');
-  } catch(err) { errEl.textContent = err.message; errEl.style.display = 'block'; }
+    window.location.href = data.formUrl;
+  } catch(err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Оформить заказ';
+  }
 }
 
 function openModal(name) { document.getElementById('modal-' + name).classList.add('open'); }
