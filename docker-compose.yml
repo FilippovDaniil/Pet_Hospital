@@ -75,24 +75,6 @@ services:
     depends_on:
       - kafka
 
-  opensearch:
-    image: opensearchproject/opensearch:2.17.0
-    container_name: hospital-opensearch
-    environment:
-      - discovery.type=single-node
-      - DISABLE_SECURITY_PLUGIN=true
-      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
-    ports:
-      - "9200:9200"
-    volumes:
-      - opensearch_data:/usr/share/opensearch/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
-      interval: 20s
-      timeout: 10s
-      retries: 10
-      start_period: 60s
-
   loki:
     image: grafana/loki:2.9.0
     container_name: hospital-loki
@@ -155,7 +137,8 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       LOKI_URL: http://loki:3100
-      OPENSEARCH_URL: http://opensearch:9200
+      # OpenSearch убран из локального стека — поиск отключён флагом.
+      OPENSEARCH_ENABLED: "false"
     depends_on:
       postgres:
         condition: service_healthy
@@ -164,8 +147,6 @@ services:
       kafka:
         condition: service_healthy
       loki:
-        condition: service_healthy
-      opensearch:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8090/actuator/health || exit 1"]
@@ -180,4 +161,3 @@ volumes:
   loki_data:
   grafana_data:
   prometheus_data:
-  opensearch_data:
